@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Details - Trust Administration System</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #1e3a5f;
+            --accent-gold: #c9a961;
+            --success-green: #28a745;
+            --danger-red: #dc3545;
+            --warning-orange: #fd7e14;
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --border-color: #dee2e6;
+            --background: #f8f9fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--primary-blue);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .logo span {
+            display: block;
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .case-header {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        .case-number {
+            font-size: 28px;
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+        }
+
+        .case-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            border-left: 3px solid var(--accent-gold);
+            padding-left: 15px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            background: white;
+            padding: 10px;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--text-light);
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            color: var(--primary-blue);
+        }
+
+        .tab.active {
+            color: var(--primary-blue);
+            border-bottom-color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            background: white;
+            border-radius: 0 10px 10px 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .documents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .document-card {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .document-card:hover {
+            border-color: var(--accent-gold);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .document-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--background);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+
+        .document-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .document-meta {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 15px;
+        }
+
+        .document-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2a4a6f;
+        }
+
+        .btn-success {
+            background: var(--success-green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-gold {
+            background: var(--accent-gold);
+            color: white;
+        }
+
+        .btn-gold:hover {
+            background: #b8982f;
+        }
+
+        .generate-section {
+            background: var(--background);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .generate-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .deadline-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .deadline-item {
+            padding: 15px;
+            border-left: 4px solid var(--accent-gold);
+            background: var(--background);
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .deadline-urgent {
+            border-left-color: var(--danger-red);
+        }
+
+        .deadline-soon {
+            border-left-color: var(--warning-orange);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-complete {
+            background: #d4edda;
+            color: var(--success-green);
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-not-started {
+            background: #f8f9fa;
+            color: var(--text-light);
+        }
+
+        .activity-log {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .activity-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-time {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-gold);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .case-info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .documents-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .generate-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>CASE DETAILS</h1>
+                <span id="case-number-header">Loading...</span>
+            </div>
+            <a href="/" class="back-link">← Back to Dashboard</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Case Header -->
+        <div class="case-header">
+            <h1 class="case-number" id="case-number">Loading Case...</h1>
+            <div class="case-info-grid" id="case-info">
+                <div class="info-item">
+                    <div class="info-label">Decedent</div>
+                    <div class="info-value" id="decedent-name">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Date of Death</div>
+                    <div class="info-value" id="death-date">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Trustee</div>
+                    <div class="info-value" id="trustee-name">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Trust Name</div>
+                    <div class="info-value" id="trust-name">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Status</div>
+                    <div class="info-value" id="case-status">
+                        <span class="status-badge status-pending">Active</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">60-Day Notice Deadline</div>
+                    <div class="info-value" id="notice-deadline">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Documents Section -->
+        <div class="generate-section">
+            <h3>Generate Documents</h3>
+            <div class="generate-grid">
+                <button class="btn btn-gold" onclick="generateDocument('60_day_notice')">
+                    📄 60-Day Notice
+                </button>
+                <button class="btn btn-primary" onclick="generateDocument('government_notices')">
+                    🏛️ Government Notices
+                </button>
+                <button class="btn btn-primary" onclick="generateDocument('property_docs')">
+                    🏠 Property Documents
+                </button>
+                <button class="btn btn-primary" onclick="generateDocument('tax_forms')">
+                    📊 Tax Forms
+                </button>
+                <button class="btn btn-primary" onclick="generateDocument('distribution_package')">
+                    📦 Distribution Package
+                </button>
+                <button class="btn btn-success" onclick="generateAllDocuments()">
+                    📑 Generate All Documents
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('documents')">Documents</button>
+            <button class="tab" onclick="switchTab('deadlines')">Deadlines</button>
+            <button class="tab" onclick="switchTab('activity')">Activity Log</button>
+            <button class="tab" onclick="switchTab('notes')">Notes</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Documents Tab -->
+            <div id="documents-tab" class="tab-panel active">
+                <div class="loading" id="documents-loading">
+                    <div class="spinner"></div>
+                    <p>Loading documents...</p>
+                </div>
+                <div class="documents-grid" id="documents-grid" style="display: none;">
+                    <!-- Documents will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Deadlines Tab -->
+            <div id="deadlines-tab" class="tab-panel">
+                <ul class="deadline-list" id="deadline-list">
+                    <!-- Deadlines will be loaded here -->
+                </ul>
+            </div>
+
+            <!-- Activity Tab -->
+            <div id="activity-tab" class="tab-panel">
+                <div class="activity-log" id="activity-log">
+                    <!-- Activity items will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Notes Tab -->
+            <div id="notes-tab" class="tab-panel">
+                <textarea id="case-notes" style="width: 100%; height: 300px; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px;" placeholder="Enter case notes here..."></textarea>
+                <button class="btn btn-primary" onclick="saveNotes()" style="margin-top: 10px;">Save Notes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCase = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const caseNumber = urlParams.get('case');
+
+        // Load case data
+        function loadCase() {
+            if (!caseNumber) {
+                document.getElementById('case-number').textContent = 'No case specified';
+                return;
+            }
+
+            // Load from localStorage
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            currentCase = cases.find(c => c.case_number === caseNumber);
+
+            if (!currentCase) {
+                document.getElementById('case-number').textContent = 'Case not found';
+                return;
+            }
+
+            // Display case information
+            document.getElementById('case-number').textContent = `Case ${currentCase.case_number}`;
+            document.getElementById('case-number-header').textContent = currentCase.case_number;
+            document.getElementById('decedent-name').textContent = currentCase.decedent_name;
+            document.getElementById('death-date').textContent = formatDate(currentCase.death_date);
+            document.getElementById('trustee-name').textContent = currentCase.trustee_name;
+            document.getElementById('trust-name').textContent = currentCase.trust_name;
+            
+            // Calculate deadline
+            if (currentCase.deadlines && currentCase.deadlines.sixty_day_notice) {
+                const deadline = new Date(currentCase.deadlines.sixty_day_notice);
+                const daysRemaining = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
+                document.getElementById('notice-deadline').innerHTML = `
+                    ${formatDate(currentCase.deadlines.sixty_day_notice)} 
+                    <span style="color: ${daysRemaining < 7 ? 'var(--danger-red)' : daysRemaining < 30 ? 'var(--warning-orange)' : 'var(--success-green)'}">
+                        (${daysRemaining} days)
+                    </span>
+                `;
+            }
+
+            // Load documents
+            loadDocuments();
+            
+            // Load deadlines
+            loadDeadlines();
+            
+            // Load activity
+            loadActivity();
+            
+            // Load notes
+            loadNotes();
+        }
+
+        // Load documents
+        function loadDocuments() {
+            const documents = JSON.parse(localStorage.getItem(`case_${caseNumber}_documents`) || '[]');
+            const grid = document.getElementById('documents-grid');
+            
+            if (documents.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">
+                        <p>No documents generated yet.</p>
+                        <p>Use the Generate Documents section above to create documents.</p>
+                    </div>
+                `;
+            } else {
+                grid.innerHTML = documents.map(doc => `
+                    <div class="document-card">
+                        <div class="document-icon">${getDocumentIcon(doc.type)}</div>
+                        <div class="document-title">${doc.name}</div>
+                        <div class="document-meta">
+                            Generated: ${formatDate(doc.created)}
+                            <br>Size: ${doc.size || 'N/A'}
+                        </div>
+                        <div class="document-actions">
+                            <button class="btn btn-primary" onclick="viewDocument('${doc.id}')">
+                                👁️ View
+                            </button>
+                            <button class="btn btn-success" onclick="downloadDocument('${doc.id}')">
+                                ⬇️ Download
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            document.getElementById('documents-loading').style.display = 'none';
+            grid.style.display = 'grid';
+        }
+
+        // Load deadlines
+        function loadDeadlines() {
+            if (!currentCase.deadlines) return;
+            
+            const deadlineList = document.getElementById('deadline-list');
+            const deadlines = [];
+            
+            Object.entries(currentCase.deadlines).forEach(([type, date]) => {
+                if (date) {
+                    const daysRemaining = Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24));
+                    deadlines.push({
+                        type: formatDeadlineType(type),
+                        date: date,
+                        days: daysRemaining
+                    });
+                }
+            });
+            
+            deadlines.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            deadlineList.innerHTML = deadlines.map(d => {
+                const urgencyClass = d.days < 7 ? 'deadline-urgent' : d.days < 30 ? 'deadline-soon' : '';
+                const statusBadge = d.days < 0 ? 'status-complete' : d.days < 7 ? 'status-urgent' : 'status-pending';
+                
+                return `
+                    <li class="deadline-item ${urgencyClass}">
+                        <div>
+                            <strong>${d.type}</strong>
+                            <br>
+                            <small>${formatDate(d.date)}</small>
+                        </div>
+                        <span class="status-badge ${statusBadge}">
+                            ${d.days < 0 ? 'Past Due' : `${d.days} days`}
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        // Load activity log
+        function loadActivity() {
+            const activities = JSON.parse(localStorage.getItem(`case_${caseNumber}_activity`) || '[]');
+            const activityLog = document.getElementById('activity-log');
+            
+            if (activities.length === 0) {
+                activityLog.innerHTML = '<p style="color: var(--text-light); text-align: center;">No activity recorded yet.</p>';
+            } else {
+                activityLog.innerHTML = activities.map(activity => `
+                    <div class="activity-item">
+                        <div class="activity-time">${formatDateTime(activity.timestamp)}</div>
+                        <div>${activity.action}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Load notes
+        function loadNotes() {
+            const notes = localStorage.getItem(`case_${caseNumber}_notes`) || '';
+            document.getElementById('case-notes').value = notes;
+        }
+
+        // Save notes
+        function saveNotes() {
+            const notes = document.getElementById('case-notes').value;
+            localStorage.setItem(`case_${caseNumber}_notes`, notes);
+            addActivity('Notes updated');
+            alert('Notes saved successfully!');
+        }
+
+        // Generate document
+        async function generateDocument(docType) {
+            if (!currentCase) return;
+            
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Generating...';
+            
+            try {
+                // Call the appropriate Netlify function
+                let endpoint = '';
+                let requestData = { ...currentCase, case_number: caseNumber };
+                
+                switch(docType) {
+                    case '60_day_notice':
+                        endpoint = 'generate-trust-documents';
+                        requestData.generate_60day_notice = true;
+                        break;
+                    case 'government_notices':
+                        endpoint = 'generate-government-notices';
+                        requestData.generate_all = true;
+                        break;
+                    case 'property_docs':
+                        endpoint = 'generate-property-documents';
+                        requestData.generate_all = true;
+                        break;
+                    case 'tax_forms':
+                        endpoint = 'fill-official-boe-forms-complete';
+                        requestData.generate_all = true;
+                        break;
+                    case 'distribution_package':
+                        endpoint = 'generate-distribution-docs';
+                        requestData.generate_all = true;
+                        break;
+                }
+                
+                const response = await fetch(`/.netlify/functions/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.documents) {
+                    // Save documents to localStorage
+                    const existingDocs = JSON.parse(localStorage.getItem(`case_${caseNumber}_documents`) || '[]');
+                    
+                    Object.entries(result.documents).forEach(([name, base64Data]) => {
+                        const docId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        existingDocs.push({
+                            id: docId,
+                            name: name,
+                            type: docType,
+                            created: new Date().toISOString(),
+                            data: base64Data,
+                            size: Math.round(base64Data.length * 0.75 / 1024) + ' KB'
+                        });
+                    });
+                    
+                    localStorage.setItem(`case_${caseNumber}_documents`, JSON.stringify(existingDocs));
+                    
+                    // Add activity
+                    addActivity(`Generated ${docType.replace('_', ' ')} documents`);
+                    
+                    // Reload documents
+                    loadDocuments();
+                    
+                    alert('Documents generated successfully!');
+                } else {
+                    throw new Error(result.error || 'Failed to generate documents');
+                }
+            } catch (error) {
+                console.error('Error generating document:', error);
+                alert('Error generating documents: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = button.innerHTML.replace('Generating...', button.textContent);
+            }
+        }
+
+        // Generate all documents
+        async function generateAllDocuments() {
+            const docTypes = ['60_day_notice', 'government_notices', 'property_docs', 'tax_forms', 'distribution_package'];
+            
+            for (const docType of docTypes) {
+                await generateDocument(docType);
+            }
+        }
+
+        // View document
+        function viewDocument(docId) {
+            const documents = JSON.parse(localStorage.getItem(`case_${caseNumber}_documents`) || '[]');
+            const doc = documents.find(d => d.id === docId);
+            
+            if (doc) {
+                // Open PDF in new window
+                const pdfWindow = window.open('', '_blank');
+                pdfWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${doc.name}</title>
+                        </head>
+                        <body style="margin: 0;">
+                            <embed src="data:application/pdf;base64,${doc.data}" 
+                                   width="100%" height="100%" type="application/pdf">
+                        </body>
+                    </html>
+                `);
+            }
+        }
+
+        // Download document
+        function downloadDocument(docId) {
+            const documents = JSON.parse(localStorage.getItem(`case_${caseNumber}_documents`) || '[]');
+            const doc = documents.find(d => d.id === docId);
+            
+            if (doc) {
+                const link = document.createElement('a');
+                link.href = 'data:application/pdf;base64,' + doc.data;
+                link.download = `${caseNumber}_${doc.name}_${formatDate(doc.created)}.pdf`;
+                link.click();
+            }
+        }
+
+        // Add activity
+        function addActivity(action) {
+            const activities = JSON.parse(localStorage.getItem(`case_${caseNumber}_activity`) || '[]');
+            activities.unshift({
+                timestamp: new Date().toISOString(),
+                action: action
+            });
+            
+            // Keep only last 50 activities
+            if (activities.length > 50) {
+                activities.length = 50;
+            }
+            
+            localStorage.setItem(`case_${caseNumber}_activity`, JSON.stringify(activities));
+            loadActivity();
+        }
+
+        // Switch tab
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update tab panels
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // Helper functions
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return `${formatDate(dateString)} ${date.toLocaleTimeString()}`;
+        }
+
+        function formatDeadlineType(type) {
+            const types = {
+                'sixty_day_notice': '60-Day Notice',
+                'contest_deadline': 'Contest Period Ends',
+                'creditor_claims': 'Creditor Claims Deadline',
+                'estate_tax_706': 'Estate Tax Return (706)',
+                'final_income_tax': 'Final Income Tax (1041)'
+            };
+            return types[type] || type;
+        }
+
+        function getDocumentIcon(type) {
+            const icons = {
+                '60_day_notice': '📄',
+                'government_notices': '🏛️',
+                'property_docs': '🏠',
+                'tax_forms': '📊',
+                'distribution_package': '📦'
+            };
+            return icons[type] || '📄';
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCase();
+        });
+    </script>
+</body>
+</html>
