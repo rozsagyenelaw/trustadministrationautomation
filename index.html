@@ -31,6 +31,12 @@
             line-height: 1.6;
         }
 
+        body.modal-open {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
         .header {
             background: var(--primary-blue);
             color: white;
@@ -258,33 +264,55 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
+            overflow-y: auto;
         }
 
         .modal-content {
             background: white;
-            margin: 50px auto;
-            padding: 30px;
+            margin: 20px auto;
+            padding: 0;
             width: 90%;
             max-width: 600px;
             border-radius: 10px;
             position: relative;
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
             font-size: 24px;
             color: var(--primary-blue);
-            margin-bottom: 20px;
-            padding-bottom: 15px;
+            padding: 20px 30px;
             border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            border-radius: 10px 10px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .close-modal {
-            position: absolute;
-            right: 20px;
-            top: 20px;
             font-size: 30px;
             color: var(--text-light);
             cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            color: var(--text-dark);
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
         }
 
         .form-group {
@@ -330,6 +358,7 @@
             font-size: 16px;
             cursor: pointer;
             transition: all 0.3s;
+            width: 100%;
         }
 
         .submit-btn:hover {
@@ -382,6 +411,11 @@
             
             .form-row {
                 grid-template-columns: 1fr;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 10px auto;
             }
         }
     </style>
@@ -540,92 +574,99 @@
     <!-- New Case Modal -->
     <div id="newCaseModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeNewCaseModal()">&times;</span>
-            <h2 class="modal-header">New Trust Administration Case</h2>
+            <div class="modal-header">
+                <h2>New Trust Administration Case</h2>
+                <button class="close-modal" onclick="closeNewCaseModal()">&times;</button>
+            </div>
             
-            <div class="success-message" id="success-msg"></div>
-            <div class="error-message" id="error-msg"></div>
-            
-            <form id="quickIntakeForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Decedent First Name *</label>
-                        <input type="text" id="decedent-first" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Decedent Last Name *</label>
-                        <input type="text" id="decedent-last" required>
-                    </div>
-                </div>
+            <div class="modal-body">
+                <div class="success-message" id="success-msg"></div>
+                <div class="error-message" id="error-msg"></div>
                 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Date of Death *</label>
-                        <input type="date" id="death-date" required>
+                <form id="quickIntakeForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Decedent First Name *</label>
+                            <input type="text" id="decedent-first" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Decedent Last Name *</label>
+                            <input type="text" id="decedent-last" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>SSN (Last 4)</label>
-                        <input type="text" id="ssn-last4" maxlength="4" pattern="\d{4}">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date of Death *</label>
+                            <input type="date" id="death-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>SSN (Last 4)</label>
+                            <input type="text" id="ssn-last4" maxlength="4" pattern="\d{4}">
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Marital Status at Death</label>
-                    <select id="marital-status">
-                        <option value="single">Single</option>
-                        <option value="married">Married</option>
-                        <option value="divorced">Divorced</option>
-                        <option value="widowed">Widowed</option>
-                    </select>
-                </div>
-                
-                <div class="form-row">
+                    
                     <div class="form-group">
-                        <label>Trustee Name *</label>
-                        <input type="text" id="trustee-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Trustee Phone</label>
-                        <input type="tel" id="trustee-phone">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Trust Name *</label>
-                    <input type="text" id="trust-name" placeholder="e.g., The John Smith Revocable Living Trust" required>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Trust Type</label>
-                        <select id="trust-type">
-                            <option value="single">Single Revocable Trust</option>
-                            <option value="joint">Joint Trust</option>
-                            <option value="ab">A/B Trust (needs split)</option>
+                        <label>Marital Status at Death</label>
+                        <select id="marital-status">
+                            <option value="single">Single</option>
+                            <option value="married">Married</option>
+                            <option value="divorced">Divorced</option>
+                            <option value="widowed">Widowed</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Estate Value (approx)</label>
-                        <input type="text" id="estate-value" placeholder="$">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trustee Name *</label>
+                            <input type="text" id="trustee-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Trustee Phone</label>
+                            <input type="tel" id="trustee-phone">
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Initial Notes</label>
-                    <textarea id="initial-notes" rows="3"></textarea>
-                </div>
-                
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Creating case and generating documents...</p>
-                </div>
-                
-                <button type="submit" class="submit-btn">Create Case & Generate Initial Documents</button>
-            </form>
+                    
+                    <div class="form-group">
+                        <label>Trust Name *</label>
+                        <input type="text" id="trust-name" placeholder="e.g., The John Smith Revocable Living Trust" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trust Type</label>
+                            <select id="trust-type">
+                                <option value="single">Single Revocable Trust</option>
+                                <option value="joint">Joint Trust</option>
+                                <option value="ab">A/B Trust (needs split)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Estate Value (approx)</label>
+                            <input type="text" id="estate-value" placeholder="$">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Initial Notes</label>
+                        <textarea id="initial-notes" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>Creating case and generating documents...</p>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">Create Case & Generate Initial Documents</button>
+                </form>
+            </div>
         </div>
     </div>
 
     <script>
+        // Store scroll position
+        let scrollPosition = 0;
+        
         // Update date and time
         function updateDateTime() {
             const now = new Date();
@@ -851,13 +892,35 @@
             }, 60000);
         });
 
-        // Modal functions
+        // Modal functions with scroll lock fix
         function openNewCaseModal() {
-            document.getElementById('newCaseModal').style.display = 'block';
+            const modal = document.getElementById('newCaseModal');
+            
+            // Store current scroll position
+            scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            
+            // Lock body scroll
+            document.body.classList.add('modal-open');
+            document.body.style.top = `-${scrollPosition}px`;
+            
+            // Show modal
+            modal.style.display = 'block';
         }
 
         function closeNewCaseModal() {
-            document.getElementById('newCaseModal').style.display = 'none';
+            const modal = document.getElementById('newCaseModal');
+            
+            // Hide modal
+            modal.style.display = 'none';
+            
+            // Unlock body scroll
+            document.body.classList.remove('modal-open');
+            document.body.style.top = '';
+            
+            // Restore scroll position
+            window.scrollTo(0, scrollPosition);
+            
+            // Reset form
             document.getElementById('quickIntakeForm').reset();
             document.getElementById('success-msg').style.display = 'none';
             document.getElementById('error-msg').style.display = 'none';
@@ -1034,10 +1097,15 @@
             alert('60-Day notices will be generated for case ' + caseNumber);
         }
 
+        // Generate 60-day notice
+        function generate60DayNotice(caseNumber) {
+            alert(`Generating 60-day notice for case ${caseNumber}`);
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
+                closeNewCaseModal();
             }
         }
     </script>
