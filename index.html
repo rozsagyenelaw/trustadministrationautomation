@@ -983,6 +983,7 @@
                                     <option value="grandparent_grandchild">Grandparent to Grandchild</option>
                                     <option value="trust">Transfer to Trust</option>
                                     <option value="cotenant_death">Co-tenant Death</option>
+                                    <option value="death">Death of Owner</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -1089,6 +1090,15 @@
         let propertyCount = 1;
         let beneficiaryCount = 1;
         
+        // Helper function to download PDF from base64
+        function downloadPDF(base64Data, filename) {
+            const linkSource = `data:application/pdf;base64,${base64Data}`;
+            const downloadLink = document.createElement("a");
+            downloadLink.href = linkSource;
+            downloadLink.download = filename;
+            downloadLink.click();
+        }
+        
         // Update date and time
         function updateDateTime() {
             const now = new Date();
@@ -1153,6 +1163,17 @@
                     <div class="form-group">
                         <label>Estimated Value</label>
                         <input type="text" id="property-value-${propertyCount}" placeholder="$">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="was-principal-residence-${propertyCount}">
+                        <label for="was-principal-residence-${propertyCount}">Was Decedent's Principal Residence</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="family-farm-${propertyCount}">
+                        <label for="family-farm-${propertyCount}">Family Farm</label>
                     </div>
                 </div>
             `;
@@ -1430,262 +1451,342 @@
             document.getElementById('error-msg').style.display = 'none';
         }
 
-        // COMPREHENSIVE Form submission with ALL data
-        document.getElementById('quickIntakeForm').addEventListener('submit', async (e) => {
+        // FIXED Form submission handler
+        document.getElementById('quickIntakeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            // Show loading
             document.getElementById('loading').style.display = 'block';
             document.getElementById('success-msg').style.display = 'none';
             document.getElementById('error-msg').style.display = 'none';
             
-            // Collect ALL properties
-            const properties = [];
-            for (let i = 1; i <= propertyCount; i++) {
-                if (document.getElementById(`property-address-${i}`)) {
-                    properties.push({
-                        address: document.getElementById(`property-address-${i}`).value,
-                        city: document.getElementById(`property-city-${i}`).value,
-                        state: document.getElementById(`property-state-${i}`).value,
-                        zip: document.getElementById(`property-zip-${i}`).value,
-                        county: document.getElementById(`property-county-${i}`).value,
-                        apn: document.getElementById(`apn-${i}`).value,
-                        type: document.getElementById(`property-type-${i}`).value,
-                        value: document.getElementById(`property-value-${i}`).value,
-                        was_principal_residence: document.getElementById(`was-principal-residence-${i}`)?.checked || false,
-                        family_farm: document.getElementById(`family-farm-${i}`)?.checked || false
-                    });
-                }
-            }
-            
-            // Collect ALL beneficiaries
-            const beneficiaries = [];
-            for (let i = 1; i <= beneficiaryCount; i++) {
-                if (document.getElementById(`beneficiary-name-${i}`)) {
-                    beneficiaries.push({
-                        name: document.getElementById(`beneficiary-name-${i}`).value,
-                        relationship: document.getElementById(`beneficiary-relationship-${i}`).value,
-                        percent: document.getElementById(`beneficiary-percent-${i}`).value,
-                        email: document.getElementById(`beneficiary-email-${i}`).value,
-                        address: document.getElementById(`beneficiary-address-${i}`).value
-                    });
-                }
-            }
-            
-            // COMPREHENSIVE form data including ALL fields needed for documents
-            const formData = {
-                // Decedent Information
-                decedent_first_name: document.getElementById('decedent-first').value,
-                decedent_middle_name: document.getElementById('decedent-middle').value,
-                decedent_last_name: document.getElementById('decedent-last').value,
-                decedent_name: `${document.getElementById('decedent-first').value} ${document.getElementById('decedent-middle').value || ''} ${document.getElementById('decedent-last').value}`.trim(),
-                death_date: document.getElementById('death-date').value,
-                death_place: document.getElementById('death-place').value,
-                ssn_last4: document.getElementById('ssn-last4').value,
-                marital_status: document.getElementById('marital-status').value,
-                gender: document.getElementById('gender').value,
-                
-                // Trust Information
-                trust_name: document.getElementById('trust-name').value,
-                trust_date: document.getElementById('trust-date').value,
-                trust_type: document.getElementById('trust-type').value,
-                trust_tax_id: document.getElementById('trust-tax-id').value,
-                estate_value: document.getElementById('estate-value').value,
-                has_amendments: document.getElementById('has-amendments').value === 'yes',
-                
-                // Trustee Information
-                trustee_name: document.getElementById('trustee-name').value,
-                trustee_relationship: document.getElementById('trustee-relationship').value,
-                trustee_address: document.getElementById('trustee-address').value,
-                trustee_city: document.getElementById('trustee-city').value,
-                trustee_state: document.getElementById('trustee-state').value,
-                trustee_zip: document.getElementById('trustee-zip').value,
-                trustee_phone: document.getElementById('trustee-phone').value,
-                trustee_email: document.getElementById('trustee-email').value,
-                has_cotrustees: document.getElementById('has-cotrustees').checked,
-                
-                // Properties
-                real_property: properties,
-                primary_property: properties[0] || {},
-                
-                // For BOE forms - use primary property data
-                property_address: properties[0]?.address || '',
-                property_city: properties[0]?.city || '',
-                property_state: properties[0]?.state || 'CA',
-                property_zip: properties[0]?.zip || '',
-                property_county: properties[0]?.county || 'Los Angeles',
-                apn: properties[0]?.apn || '',
-                was_principal_residence: properties[0]?.was_principal_residence || false,
-                family_farm: properties[0]?.family_farm || false,
-                
-                // Beneficiaries
-                beneficiaries: beneficiaries,
-                total_beneficiaries: beneficiaries.length,
-                
-                // BOE Form Specific Data
-                transfer_type: document.getElementById('transfer-type').value,
-                transfer_date: document.getElementById('transfer-date').value || document.getElementById('death-date').value,
-                homeowners_exemption: document.getElementById('homeowners-exemption').checked,
-                disabled_veteran: document.getElementById('disabled-veteran').checked,
-                document_number: document.getElementById('document-number').value,
-                purchase_price: document.getElementById('purchase-price').value || '0',
-                
-                // Map trustee as buyer for BOE forms
-                buyer_name: document.getElementById('trustee-name').value,
-                buyer_address: document.getElementById('trustee-address').value,
-                buyer_city: document.getElementById('trustee-city').value,
-                buyer_state: document.getElementById('trustee-state').value || 'CA',
-                buyer_zip: document.getElementById('trustee-zip').value,
-                buyer_email: document.getElementById('trustee-email').value,
-                buyer_phone: document.getElementById('trustee-phone').value,
-                
-                // Additional fields for BOE forms
-                seller_name: `${document.getElementById('decedent-first').value} ${document.getElementById('decedent-last').value}`,
-                principal_residence: properties[0]?.was_principal_residence || false,
-                transfer_to: document.getElementById('transfer-type').value === 'parent_child' ? 'child' : 
-                            document.getElementById('transfer-type').value === 'spouse' ? 'spouse' : 'trust',
-                
-                // Contact information (for BOE-502-D)
-                contact_name: document.getElementById('trustee-name').value,
-                contact_phone: document.getElementById('trustee-phone').value,
-                contact_email: document.getElementById('trustee-email').value,
-                
-                // Additional Information
-                fee_arrangement: document.getElementById('fee-arrangement').value,
-                urgency_level: document.getElementById('urgency-level').value,
-                initial_notes: document.getElementById('initial-notes').value,
-                
-                // Documents to Generate
-                generate_initial_docs: true,
-                generate_60day: document.getElementById('gen-60day').checked,
-                generate_gov_notices: document.getElementById('gen-gov-notices').checked,
-                generate_boe_forms: document.getElementById('gen-boe-forms').checked,
-                generate_property_docs: document.getElementById('gen-property-docs').checked,
-                generate_distribution_docs: document.getElementById('gen-distribution-docs').checked
-            };
-            
             try {
-                // Create the case
-                const response = await fetch('/.netlify/functions/create-trust-case', {
+                // Collect ALL form data properly
+                const formData = {
+                    // Decedent info
+                    decedent_first_name: document.getElementById('decedent-first').value,
+                    decedent_middle_name: document.getElementById('decedent-middle').value,
+                    decedent_last_name: document.getElementById('decedent-last').value,
+                    death_date: document.getElementById('death-date').value,
+                    death_place: document.getElementById('death-place').value,
+                    ssn_last4: document.getElementById('ssn-last4').value,
+                    marital_status: document.getElementById('marital-status').value,
+                    gender: document.getElementById('gender').value,
+                    
+                    // Trust info
+                    trust_name: document.getElementById('trust-name').value,
+                    trust_date: document.getElementById('trust-date').value,
+                    trust_type: document.getElementById('trust-type').value,
+                    trust_tax_id: document.getElementById('trust-tax-id').value,
+                    estate_value: document.getElementById('estate-value').value,
+                    has_amendments: document.getElementById('has-amendments').value === 'yes',
+                    
+                    // Trustee info
+                    trustee_name: document.getElementById('trustee-name').value,
+                    trustee_relationship: document.getElementById('trustee-relationship').value,
+                    trustee_address: document.getElementById('trustee-address').value,
+                    trustee_city: document.getElementById('trustee-city').value,
+                    trustee_state: document.getElementById('trustee-state').value,
+                    trustee_zip: document.getElementById('trustee-zip').value,
+                    trustee_phone: document.getElementById('trustee-phone').value,
+                    trustee_email: document.getElementById('trustee-email').value,
+                    has_cotrustees: document.getElementById('has-cotrustees').checked,
+                    
+                    // Primary property (for BOE forms)
+                    property_address: document.getElementById('property-address-1')?.value || '',
+                    property_city: document.getElementById('property-city-1')?.value || '',
+                    property_state: document.getElementById('property-state-1')?.value || 'CA',
+                    property_zip: document.getElementById('property-zip-1')?.value || '',
+                    property_county: document.getElementById('property-county-1')?.value || 'Los Angeles',
+                    apn: document.getElementById('apn-1')?.value || '',
+                    was_principal_residence: document.getElementById('was-principal-residence-1')?.checked || false,
+                    family_farm: document.getElementById('family-farm-1')?.checked || false,
+                    
+                    // Transfer info
+                    transfer_type: document.getElementById('transfer-type').value || 'death',
+                    transfer_date: document.getElementById('transfer-date').value || document.getElementById('death-date').value,
+                    homeowners_exemption: document.getElementById('homeowners-exemption').checked,
+                    disabled_veteran: document.getElementById('disabled-veteran').checked,
+                    document_number: document.getElementById('document-number').value,
+                    purchase_price: document.getElementById('purchase-price').value || '0',
+                    
+                    // Document generation flags
+                    generate_60day: document.getElementById('gen-60day').checked,
+                    generate_gov_notices: document.getElementById('gen-gov-notices').checked,
+                    generate_boe_forms: document.getElementById('gen-boe-forms').checked,
+                    generate_property_docs: document.getElementById('gen-property-docs').checked,
+                    generate_distribution_docs: document.getElementById('gen-distribution-docs').checked,
+                    
+                    // Additional info
+                    fee_arrangement: document.getElementById('fee-arrangement').value,
+                    urgency_level: document.getElementById('urgency-level').value,
+                    initial_notes: document.getElementById('initial-notes').value
+                };
+                
+                // Collect all properties
+                const properties = [];
+                for (let i = 1; i <= 10; i++) {
+                    const addressField = document.getElementById(`property-address-${i}`);
+                    if (addressField && addressField.value) {
+                        properties.push({
+                            address: addressField.value,
+                            city: document.getElementById(`property-city-${i}`)?.value || '',
+                            state: document.getElementById(`property-state-${i}`)?.value || 'CA',
+                            zip: document.getElementById(`property-zip-${i}`)?.value || '',
+                            county: document.getElementById(`property-county-${i}`)?.value || 'Los Angeles',
+                            apn: document.getElementById(`apn-${i}`)?.value || '',
+                            type: document.getElementById(`property-type-${i}`)?.value || '',
+                            value: document.getElementById(`property-value-${i}`)?.value || '',
+                            was_principal_residence: document.getElementById(`was-principal-residence-${i}`)?.checked || false,
+                            family_farm: document.getElementById(`family-farm-${i}`)?.checked || false
+                        });
+                    }
+                }
+                if (properties.length > 0) {
+                    formData.real_property = properties;
+                }
+                
+                // Collect all beneficiaries
+                const beneficiaries = [];
+                for (let i = 1; i <= 10; i++) {
+                    const nameField = document.getElementById(`beneficiary-name-${i}`);
+                    if (nameField && nameField.value) {
+                        beneficiaries.push({
+                            name: nameField.value,
+                            relationship: document.getElementById(`beneficiary-relationship-${i}`)?.value || '',
+                            relation: document.getElementById(`beneficiary-relationship-${i}`)?.value || '', // Add both for compatibility
+                            percent: document.getElementById(`beneficiary-percent-${i}`)?.value || '',
+                            email: document.getElementById(`beneficiary-email-${i}`)?.value || '',
+                            address: document.getElementById(`beneficiary-address-${i}`)?.value || ''
+                        });
+                    }
+                }
+                if (beneficiaries.length > 0) {
+                    formData.beneficiaries = beneficiaries;
+                }
+                
+                console.log('Submitting form data:', formData);
+                
+                // Step 1: Create the case
+                const caseResponse = await fetch('/.netlify/functions/create-trust-case', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
                 });
                 
-                const result = await response.json();
+                if (!caseResponse.ok) {
+                    const errorText = await caseResponse.text();
+                    console.error('Case creation failed:', errorText);
+                    throw new Error('Failed to create case');
+                }
                 
-                if (result.success) {
-                    // Save case to localStorage
-                    const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
-                    cases.push({
-                        case_number: result.case_number,
-                        decedent_name: formData.decedent_name,
-                        death_date: formData.death_date,
-                        trustee_name: formData.trustee_name,
-                        trust_name: formData.trust_name,
-                        deadlines: result.case_data.deadlines,
-                        created: new Date().toISOString(),
-                        // Store all data for later document generation
-                        full_data: formData
-                    });
-                    localStorage.setItem('trust_cases', JSON.stringify(cases));
-                    
-                    // Now generate documents if requested
-                    const documentsGenerated = [];
-                    
-                    // Generate BOE Forms
-                    if (formData.generate_boe_forms) {
-                        try {
-                            const boeResponse = await fetch('/.netlify/functions/generate-boe-forms-fixed', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    ...formData,
-                                    case_number: result.case_number,
-                                    generate_pcor: true,
-                                    generate_502d: true,
-                                    generate_19p: formData.transfer_type === 'parent_child'
-                                })
-                            });
-                            
+                const caseResult = await caseResponse.json();
+                console.log('Case created:', caseResult);
+                
+                if (!caseResult.success) {
+                    throw new Error(caseResult.error || 'Failed to create case');
+                }
+                
+                const caseNumber = caseResult.case_number;
+                const caseData = caseResult.case_data;
+                
+                // Save to localStorage
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                cases.push({
+                    ...caseData,
+                    full_data: formData
+                });
+                localStorage.setItem('trust_cases', JSON.stringify(cases));
+                
+                // Step 2: Generate documents
+                const documentsGenerated = [];
+                
+                // Generate BOE forms
+                if (formData.generate_boe_forms) {
+                    try {
+                        console.log('Generating BOE forms...');
+                        const boeResponse = await fetch('/.netlify/functions/generate-boe-forms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...caseData,
+                                ...formData,
+                                case_number: caseNumber,
+                                generate_pcor: true,
+                                generate_502d: true,
+                                generate_19p: formData.transfer_type === 'parent_child'
+                            })
+                        });
+                        
+                        if (boeResponse.ok) {
                             const boeResult = await boeResponse.json();
-                            if (boeResult.success) {
-                                documentsGenerated.push('BOE Forms');
-                                // Download the generated PDFs
-                                if (boeResult.documents) {
-                                    for (const [name, base64] of Object.entries(boeResult.documents)) {
-                                        downloadPDF(base64, `${result.case_number}_${name}.pdf`);
-                                    }
+                            console.log('BOE result:', boeResult);
+                            
+                            if (boeResult.success && boeResult.documents) {
+                                if (boeResult.documents.pcor) {
+                                    downloadPDF(boeResult.documents.pcor, `${caseNumber}_BOE-502-A.pdf`);
+                                    documentsGenerated.push('BOE-502-A');
+                                }
+                                if (boeResult.documents.boe_502d) {
+                                    downloadPDF(boeResult.documents.boe_502d, `${caseNumber}_BOE-502-D.pdf`);
+                                    documentsGenerated.push('BOE-502-D');
+                                }
+                                if (boeResult.documents.boe_19p) {
+                                    downloadPDF(boeResult.documents.boe_19p, `${caseNumber}_BOE-19-P.pdf`);
+                                    documentsGenerated.push('BOE-19-P');
                                 }
                             }
-                        } catch (err) {
-                            console.error('BOE generation error:', err);
                         }
+                    } catch (boeError) {
+                        console.error('BOE generation error:', boeError);
                     }
-                    
-                    // Generate Government Notices
-                    if (formData.generate_gov_notices) {
-                        try {
-                            const govResponse = await fetch('/.netlify/functions/generate-government-notices', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    ...formData,
-                                    case_number: result.case_number,
-                                    agencies: ['ftb', 'irs', 'dhcs', 'ssa']
-                                })
-                            });
-                            
-                            const govResult = await govResponse.json();
-                            if (govResult.success) {
-                                documentsGenerated.push('Government Notices');
-                            }
-                        } catch (err) {
-                            console.error('Government notices error:', err);
-                        }
-                    }
-                    
-                    document.getElementById('success-msg').innerHTML = `
-                        ✅ Case ${result.case_number} created successfully!<br>
-                        📄 Documents generated: ${documentsGenerated.join(', ') || 'None'}<br>
-                        ⏰ 60-day notice deadline: ${result.case_data.deadlines.sixty_day_notice}
-                    `;
-                    document.getElementById('success-msg').style.display = 'block';
-                    
-                    // Reload data
-                    loadCases();
-                    loadDeadlines();
-                    
-                    // Close modal after 5 seconds
-                    setTimeout(() => {
-                        closeNewCaseModal();
-                    }, 5000);
-                } else {
-                    throw new Error(result.error || 'Failed to create case');
                 }
+                
+                // Generate government notices
+                if (formData.generate_gov_notices) {
+                    try {
+                        console.log('Generating government notices...');
+                        const govResponse = await fetch('/.netlify/functions/generate-government-notices', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...caseData,
+                                ...formData,
+                                case_number: caseNumber,
+                                agencies: ['ftb', 'irs', 'dhcs', 'ssa']
+                            })
+                        });
+                        
+                        if (govResponse.ok) {
+                            const govResult = await govResponse.json();
+                            if (govResult.success && govResult.documents) {
+                                for (const [agency, pdfBase64] of Object.entries(govResult.documents)) {
+                                    downloadPDF(pdfBase64, `${caseNumber}_${agency}.pdf`);
+                                    documentsGenerated.push(agency);
+                                }
+                            }
+                        }
+                    } catch (govError) {
+                        console.error('Government notices error:', govError);
+                    }
+                }
+                
+                // Generate trust documents
+                if (formData.generate_60day) {
+                    try {
+                        console.log('Generating 60-day notices...');
+                        const trustResponse = await fetch('/.netlify/functions/generate-trust-documents', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...caseData,
+                                ...formData,
+                                case_number: caseNumber,
+                                generate_receipt: true,
+                                generate_waiver: true,
+                                generate_60day_notice: true
+                            })
+                        });
+                        
+                        if (trustResponse.ok) {
+                            const trustResult = await trustResponse.json();
+                            if (trustResult.success && trustResult.documents) {
+                                for (const [docName, pdfBase64] of Object.entries(trustResult.documents)) {
+                                    downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                                    documentsGenerated.push(docName);
+                                }
+                            }
+                        }
+                    } catch (trustError) {
+                        console.error('Trust documents error:', trustError);
+                    }
+                }
+                
+                // Generate property documents
+                if (formData.generate_property_docs) {
+                    try {
+                        console.log('Generating property documents...');
+                        const propResponse = await fetch('/.netlify/functions/generate-property-documents', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...caseData,
+                                ...formData,
+                                case_number: caseNumber,
+                                generate_affidavit: true,
+                                generate_trust_deed: true,
+                                generate_certification: true,
+                                
+                                // Add specific fields for property docs
+                                grantor_name: formData.trustee_name,
+                                grantor_address: formData.trustee_address,
+                                surviving_trustee: formData.trustee_name,
+                                instrument_number: formData.document_number || '',
+                                deed_date: formData.transfer_date || ''
+                            })
+                        });
+                        
+                        if (propResponse.ok) {
+                            const propResult = await propResponse.json();
+                            if (propResult.success && propResult.documents) {
+                                for (const [docName, pdfBase64] of Object.entries(propResult.documents)) {
+                                    downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                                    documentsGenerated.push(docName);
+                                }
+                            }
+                        }
+                    } catch (propError) {
+                        console.error('Property documents error:', propError);
+                    }
+                }
+                
+                // Show success message
+                document.getElementById('success-msg').innerHTML = `
+                    <strong>✅ Success!</strong><br>
+                    Case Number: ${caseNumber}<br>
+                    Documents Generated: ${documentsGenerated.length > 0 ? documentsGenerated.join(', ') : 'None'}<br>
+                    60-Day Notice Deadline: ${caseData.deadlines?.sixty_day_notice || 'N/A'}
+                `;
+                document.getElementById('success-msg').style.display = 'block';
+                
+                // Update recent documents
+                const recentDocs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
+                documentsGenerated.forEach(docName => {
+                    recentDocs.unshift({
+                        name: `${caseNumber} - ${docName}`,
+                        status: 'complete',
+                        created: new Date().toISOString()
+                    });
+                });
+                localStorage.setItem('recent_documents', JSON.stringify(recentDocs.slice(0, 50)));
+                
+                // Reload the cases table
+                loadCases();
+                loadDeadlines();
+                loadRecentDocuments();
+                
+                // Close modal after 5 seconds
+                setTimeout(() => {
+                    closeNewCaseModal();
+                }, 5000);
+                
             } catch (error) {
-                document.getElementById('error-msg').textContent = `Error: ${error.message}`;
+                console.error('Error:', error);
+                document.getElementById('error-msg').innerHTML = `
+                    <strong>Error:</strong> ${error.message}<br>
+                    Please check the console for details.
+                `;
                 document.getElementById('error-msg').style.display = 'block';
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
         });
 
-        // Download PDF helper
-        function downloadPDF(base64Data, filename) {
-            const link = document.createElement('a');
-            link.href = 'data:application/pdf;base64,' + base64Data;
-            link.download = filename;
-            link.click();
-        }
-
         // Generate BOE Forms for existing case
         async function generateBOEForms() {
-            const caseNumber = prompt('Enter Case Number (e.g., TA-2024-001):');
+            const caseNumber = prompt('Enter Case Number (e.g., TA-202411-1234):');
             if (!caseNumber) return;
             
-            // Get case data from localStorage
             const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
             const caseData = cases.find(c => c.case_number === caseNumber);
             
@@ -1695,13 +1796,12 @@
             }
             
             try {
-                const response = await fetch('/.netlify/functions/generate-boe-forms-fixed', {
+                const response = await fetch('/.netlify/functions/generate-boe-forms', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ...caseData.full_data,
+                        ...caseData,
                         case_number: caseNumber,
                         generate_pcor: true,
                         generate_502d: true,
@@ -1709,16 +1809,29 @@
                     })
                 });
                 
-                const result = await response.json();
-                if (result.success && result.documents) {
-                    alert('BOE forms generated successfully!');
-                    for (const [name, base64] of Object.entries(result.documents)) {
-                        downloadPDF(base64, `${caseNumber}_${name}.pdf`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.documents) {
+                        if (result.documents.pcor) {
+                            downloadPDF(result.documents.pcor, `${caseNumber}_BOE-502-A.pdf`);
+                        }
+                        if (result.documents.boe_502d) {
+                            downloadPDF(result.documents.boe_502d, `${caseNumber}_BOE-502-D.pdf`);
+                        }
+                        if (result.documents.boe_19p) {
+                            downloadPDF(result.documents.boe_19p, `${caseNumber}_BOE-19-P.pdf`);
+                        }
+                        alert('BOE forms generated successfully!');
+                    } else {
+                        alert('Failed to generate BOE forms. Check console for details.');
                     }
                 } else {
-                    alert('Error generating BOE forms: ' + (result.error || 'Unknown error'));
+                    const errorText = await response.text();
+                    console.error('BOE generation failed:', errorText);
+                    alert('Error generating BOE forms. Check console for details.');
                 }
             } catch (error) {
+                console.error('Error:', error);
                 alert('Error generating BOE forms: ' + error.message);
             }
         }
@@ -1727,14 +1840,76 @@
         function generateGovernmentNotices() {
             const caseNumber = prompt('Enter Case Number for Government Notices:');
             if (caseNumber) {
-                alert('Government notices will be generated for case ' + caseNumber);
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                const caseData = cases.find(c => c.case_number === caseNumber);
+                
+                if (!caseData) {
+                    alert('Case not found.');
+                    return;
+                }
+                
+                fetch('/.netlify/functions/generate-government-notices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseNumber,
+                        agencies: ['ftb', 'irs', 'dhcs', 'ssa']
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.documents) {
+                        for (const [agency, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseNumber}_${agency}.pdf`);
+                        }
+                        alert('Government notices generated successfully!');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate government notices.');
+                });
             }
         }
 
         function generatePropertyDocs() {
             const caseNumber = prompt('Enter Case Number for Property Documents:');
             if (caseNumber) {
-                alert('Property documents will be generated for case ' + caseNumber);
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                const caseData = cases.find(c => c.case_number === caseNumber);
+                
+                if (!caseData) {
+                    alert('Case not found.');
+                    return;
+                }
+                
+                fetch('/.netlify/functions/generate-property-documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseNumber,
+                        generate_affidavit: true,
+                        generate_trust_deed: true,
+                        generate_certification: true
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.documents) {
+                        for (const [docName, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                        }
+                        alert('Property documents generated successfully!');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate property documents.');
+                });
             }
         }
 
@@ -1748,12 +1923,48 @@
         function generateNotices() {
             const caseNumber = prompt('Enter Case Number for 60-Day Notices:');
             if (caseNumber) {
-                alert('60-Day notices will be generated for case ' + caseNumber);
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                const caseData = cases.find(c => c.case_number === caseNumber);
+                
+                if (!caseData) {
+                    alert('Case not found.');
+                    return;
+                }
+                
+                fetch('/.netlify/functions/generate-trust-documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseNumber,
+                        generate_60day_notice: true,
+                        generate_receipt: true,
+                        generate_waiver: true
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.documents) {
+                        for (const [docName, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                        }
+                        alert('60-day notices generated successfully!');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to generate notices.');
+                });
             }
         }
 
         function viewCase(caseNumber) {
-            window.location.href = `/case-details.html?case=${caseNumber}`;
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            const caseData = cases.find(c => c.case_number === caseNumber);
+            if (caseData) {
+                alert(`Case Details:\n\nCase #: ${caseNumber}\nDecedent: ${caseData.decedent_name}\nTrustee: ${caseData.trustee_name}\nTrust: ${caseData.trust_name}`);
+            }
         }
 
         function generateDocsForCase(caseNumber) {
@@ -1761,6 +1972,8 @@
             
             switch(docType) {
                 case '1':
+                    // Set case number and call BOE generation
+                    document.getElementById('newCaseModal').style.display = 'none';
                     generateBOEForms();
                     break;
                 case '2':
