@@ -1,9 +1,7 @@
 // netlify/functions/generate-boe-forms.js
-// WORKING VERSION - Uses local template files from public/templates folder
+// COMPLETE VERSION - Downloads templates from deployed site like conservatorship
 
 const { PDFDocument } = require('pdf-lib');
-const fs = require('fs').promises;
-const path = require('path');
 
 // Helper function to format date
 function formatDate(dateString) {
@@ -12,27 +10,39 @@ function formatDate(dateString) {
   return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
 }
 
+// Load PDF from deployed Netlify site (matching conservatorship pattern)
+async function loadPDFFromDeployedSite(filename) {
+  const fetch = (await import('node-fetch')).default;
+  // UPDATE THIS URL to your deployed trust administration app URL
+  const url = `https://your-trust-admin-app.netlify.app/templates/${filename}`;
+  
+  try {
+    console.log(`Loading ${filename} from deployed site...`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load ${filename}: ${response.statusText}`);
+    }
+    const buffer = await response.buffer();
+    return buffer;
+  } catch (error) {
+    console.error(`Error loading ${filename}:`, error);
+    throw error;
+  }
+}
+
 // Fill BOE-502-A (PCOR) - Official Form
-async function fillPCOR(data) {
+async function fillPCOR(data, pdfBytes) {
   try {
     console.log('Filling BOE-502-A (PCOR) form...');
     
-    // Load the template from local file system
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-502-A.pdf');
-    console.log('Loading template from:', templatePath);
-    
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
-    
-    // Get the form
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
     // Get all field names for debugging
     const fields = form.getFields();
     console.log('BOE-502-A available fields:', fields.map(f => f.getName()));
     
-    // Try to fill fields with various possible names
-    // These are common field names in BOE-502-A form
+    // Field mappings
     const fieldMappings = [
       // Buyer Information
       { fieldNames: ['Buyer Name', 'Name', 'buyer_name', 'Transferee Name', 'Name and mailing address of buyer/transferee'], value: data.buyer_name || data.trustee_name },
@@ -59,7 +69,7 @@ async function fillPCOR(data) {
       { fieldNames: ['Document Number', 'Recording Number', 'document_number'], value: data.document_number },
     ];
     
-    // Try to fill each field
+    // Fill text fields
     for (const mapping of fieldMappings) {
       if (!mapping.value) continue;
       
@@ -69,7 +79,7 @@ async function fillPCOR(data) {
           if (field) {
             field.setText(String(mapping.value));
             console.log(`Filled field "${fieldName}" with "${mapping.value}"`);
-            break; // Move to next mapping once field is found
+            break;
           }
         } catch (e) {
           // Field doesn't exist with this name, try next
@@ -77,7 +87,7 @@ async function fillPCOR(data) {
       }
     }
     
-    // Handle checkboxes for transfer type
+    // Checkbox mappings
     const checkboxMappings = [
       // Spouse transfer
       { condition: data.transfer_type === 'spouse', fieldNames: ['A. This transfer is solely between spouses (addition or removal of a spouse, death of a spouse, divorce settlement, etc.)­yes', 'Spouse Transfer', 'spouse_transfer'] },
@@ -108,7 +118,7 @@ async function fillPCOR(data) {
       { condition: data.family_farm === false, fieldNames: ['Is this a family farm? No', 'Family Farm No'] },
     ];
     
-    // Try to check appropriate boxes
+    // Check appropriate boxes
     for (const mapping of checkboxMappings) {
       if (!mapping.condition) continue;
       
@@ -126,11 +136,7 @@ async function fillPCOR(data) {
       }
     }
     
-    // Don't flatten the form so it remains editable
-    // form.flatten();
-    
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling PCOR form:', error);
@@ -139,17 +145,11 @@ async function fillPCOR(data) {
 }
 
 // Fill BOE-502-D (Death of Real Property Owner)
-async function fillBOE502D(data) {
+async function fillBOE502D(data, pdfBytes) {
   try {
     console.log('Filling BOE-502-D (Death of Real Property Owner) form...');
     
-    // Load the template from local file system
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-502-D.pdf');
-    console.log('Loading template from:', templatePath);
-    
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
-    
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
     // Get all field names for debugging
@@ -301,8 +301,7 @@ async function fillBOE502D(data) {
       }
     }
     
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling BOE-502-D form:', error);
@@ -311,17 +310,11 @@ async function fillBOE502D(data) {
 }
 
 // Fill BOE-19-P (Parent-Child Exclusion)
-async function fillBOE19P(data) {
+async function fillBOE19P(data, pdfBytes) {
   try {
     console.log('Filling BOE-19-P (Parent-Child Exclusion) form...');
     
-    // Load the template from local file system
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-19-P.pdf');
-    console.log('Loading template from:', templatePath);
-    
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
-    
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
     // Get all field names for debugging
@@ -442,8 +435,7 @@ async function fillBOE19P(data) {
       }
     }
     
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling BOE-19-P form:', error);
@@ -451,10 +443,44 @@ async function fillBOE19P(data) {
   }
 }
 
-// Main handler
+// Main function to fill all BOE forms
+async function fillBOEForms(data) {
+  const results = {};
+  const errors = [];
+  
+  const forms = [
+    { name: 'BOE-502-A', key: 'pcor', generate: data.generate_pcor, filler: fillPCOR },
+    { name: 'BOE-502-D', key: 'boe_502d', generate: data.generate_502d, filler: fillBOE502D },
+    { name: 'BOE-19-P', key: 'boe_19p', generate: data.generate_19p, filler: fillBOE19P },
+  ];
+  
+  for (const { name, key, generate, filler } of forms) {
+    if (!generate) {
+      console.log(`Skipping ${name} - not requested`);
+      continue;
+    }
+    
+    try {
+      console.log(`Processing ${name}...`);
+      const pdfBytes = await loadPDFFromDeployedSite(`${name}.pdf`);
+      const filledPdf = await filler(data, pdfBytes);
+      results[key] = Buffer.from(filledPdf).toString('base64');
+      console.log(`${name} completed successfully`);
+    } catch (error) {
+      console.error(`Error with ${name}:`, error);
+      errors.push(`${name}: ${error.message}`);
+      // Continue processing other forms even if one fails
+    }
+  }
+  
+  return { results, errors };
+}
+
+// Main handler (matching conservatorship pattern)
 exports.handler = async (event, context) => {
   console.log('Generate BOE Forms handler called');
   
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -467,6 +493,7 @@ exports.handler = async (event, context) => {
     };
   }
   
+  // Validate HTTP method
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -479,47 +506,67 @@ exports.handler = async (event, context) => {
   }
   
   try {
+    // Parse request body
     const data = JSON.parse(event.body);
     console.log('Processing BOE forms for case:', data.case_number);
+    console.log('Forms requested:', {
+      pcor: data.generate_pcor,
+      boe_502d: data.generate_502d,
+      boe_19p: data.generate_19p
+    });
     
-    const documents = {};
-    let errors = [];
-    
-    // Generate requested forms
-    if (data.generate_pcor) {
-      try {
-        console.log('Generating PCOR (BOE-502-A)...');
-        const pcorPdf = await fillPCOR(data);
-        documents.pcor = Buffer.from(pcorPdf).toString('base64');
-        console.log('PCOR generated successfully');
-      } catch (error) {
-        console.error('Error generating PCOR:', error);
-        errors.push(`PCOR: ${error.message}`);
-      }
+    // Validate that at least one form is requested
+    if (!data.generate_pcor && !data.generate_502d && !data.generate_19p) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'No forms selected for generation'
+        })
+      };
     }
     
-    if (data.generate_502d) {
-      try {
-        console.log('Generating BOE-502-D...');
-        const deathPdf = await fillBOE502D(data);
-        documents.boe_502d = Buffer.from(deathPdf).toString('base64');
-        console.log('BOE-502-D generated successfully');
-      } catch (error) {
-        console.error('Error generating BOE-502-D:', error);
-        errors.push(`BOE-502-D: ${error.message}`);
-      }
+    // Fill the forms
+    const { results: documents, errors } = await fillBOEForms(data);
+    
+    // Check if any forms were generated
+    if (Object.keys(documents).length === 0) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to generate any forms',
+          errors: errors
+        })
+      };
     }
     
-    if (data.generate_19p) {
-      try {
-        console.log('Generating BOE-19-P...');
-        const parentChildPdf = await fillBOE19P(data);
-        documents.boe_19p = Buffer.from(parentChildPdf).toString('base64');
-        console.log('BOE-19-P generated successfully');
-      } catch (error) {
-        console.error('Error generating BOE-19-P:', error);
-        errors.push(`BOE-19-P: ${error.message}`);
+    // Build successful response
+    const response = {
+      success: true,
+      message: `Generated ${Object.keys(documents).length} BOE forms`,
+      documents: documents,
+      case_number: data.case_number,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        decedent: data.decedent_name,
+        trustee: data.trustee_name,
+        forms_generated: Object.keys(documents)
       }
+    };
+    
+    // Add errors if any (partial success)
+    if (errors.length > 0) {
+      response.errors = errors;
+      response.message += ` (${errors.length} forms failed)`;
     }
     
     return {
@@ -528,13 +575,7 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({
-        success: true,
-        message: `Generated ${Object.keys(documents).length} BOE forms`,
-        documents: documents,
-        case_number: data.case_number,
-        errors: errors.length > 0 ? errors : undefined
-      })
+      body: JSON.stringify(response)
     };
     
   } catch (error) {
