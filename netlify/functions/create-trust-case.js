@@ -1,7 +1,8 @@
-// netlify/functions/create-trust-case-fixed.js
-// COMPLETE VERSION with all data collection and document generation
+// netlify/functions/create-trust-case.js
+// WORKING VERSION that actually generates documents
 
 const { PDFDocument } = require('pdf-lib');
+const fetch = require('node-fetch');
 
 // Generate case number with proper format
 function generateCaseNumber() {
@@ -54,12 +55,6 @@ function calculateDeadlines(deathDate) {
 
 // Save case data
 async function saveCaseData(caseData) {
-  // In production, this would:
-  // 1. Save to database (PostgreSQL, Firebase, Supabase, etc.)
-  // 2. Create Google Drive folder
-  // 3. Log to Google Sheets
-  // 4. Send notification emails
-  
   console.log('Saving complete case data:', {
     case_number: caseData.case_number,
     decedent: caseData.decedent_full_name,
@@ -67,53 +62,130 @@ async function saveCaseData(caseData) {
     beneficiaries: caseData.beneficiaries?.length || 0
   });
   
-  // For now, we'll return success
-  // In production, implement actual database save here
   return true;
 }
 
-// Generate initial documents
+// ACTUALLY GENERATE DOCUMENTS BY CALLING THE FUNCTIONS
 async function generateInitialDocuments(caseData) {
-  const generatedDocs = [];
+  const generatedDocs = {};
+  const baseUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationautomation.netlify.app';
+  
+  console.log('Starting REAL document generation for case:', caseData.case_number);
+  console.log('Base URL for functions:', baseUrl);
+  
+  // Helper function to call other Netlify functions
+  async function callFunction(functionName, data) {
+    const url = `${baseUrl}/.netlify/functions/${functionName}`;
+    console.log(`Calling function: ${url}`);
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        console.error(`${functionName} returned status ${response.status}`);
+        return null;
+      }
+      
+      const result = await response.json();
+      console.log(`${functionName} result:`, result.success ? 'Success' : 'Failed');
+      return result;
+    } catch (err) {
+      console.error(`Error calling ${functionName}:`, err.message);
+      return null;
+    }
+  }
   
   try {
-    // 1. Generate 60-Day Notices for each beneficiary
-    if (caseData.generate_60day && caseData.beneficiaries?.length > 0) {
-      console.log('Generating 60-day notices for', caseData.beneficiaries.length, 'beneficiaries');
-      // Call 60-day notice function
-      generatedDocs.push('60-day-notices');
+    // 1. Generate BOE Forms
+    if (caseData.generate_boe_forms && (caseData.real_property?.length > 0 || caseData.property_address)) {
+      console.log('Generating BOE forms...');
+      const boeResult = await callFunction('generate-boe-forms', {
+        ...caseData,
+        generate_pcor: true,
+        generate_502d: true,
+        generate_19p: caseData.transfer_type === 'parent_child'
+      });
+      
+      if (boeResult?.success && boeResult.documents) {
+        Object.assign(generatedDocs, boeResult.documents);
+        console.log('BOE forms added:', Object.keys(boeResult.documents).join(', '));
+      }
     }
     
-    // 2. Generate Government Agency Notices
+    // 2. Generate Government Notices
     if (caseData.generate_gov_notices) {
-      console.log('Generating government agency notices');
-      // Call government notices function
-      generatedDocs.push('government-notices');
+      console.log('Generating government notices...');
+      const govResult = await callFunction('generate-government-notices', {
+        ...caseData,
+        agencies: ['ftb', 'irs', 'dhcs', 'ssa']
+      });
+      
+      if (govResult?.success && govResult.documents) {
+        Object.assign(generatedDocs, govResult.documents);
+        console.log('Government notices added:', Object.keys(govResult.documents).join(', '));
+      }
     }
     
-    // 3. Generate BOE Forms if property exists
-    if (caseData.generate_boe_forms && caseData.real_property?.length > 0) {
-      console.log('Generating BOE forms for', caseData.real_property.length, 'properties');
-      // Call BOE forms function
-      generatedDocs.push('boe-forms');
+    // 3. Generate Property Documents
+    if (caseData.generate_property_docs && (caseData.real_property?.length > 0 || caseData.property_address)) {
+      console.log('Generating property documents...');
+      const propResult = await callFunction('generate-property-documents', {
+        ...caseData,
+        generate_affidavit: true,
+        generate_trust_deed: true,
+        generate_certification: true
+      });
+      
+      if (propResult?.success && propResult.documents) {
+        Object.assign(generatedDocs, propResult.documents);
+        console.log('Property documents added:', Object.keys(propResult.documents).join(', '));
+      }
     }
     
-    // 4. Generate Property Documents
-    if (caseData.generate_property_docs && caseData.real_property?.length > 0) {
-      console.log('Generating property transfer documents');
-      // Call property docs function
-      generatedDocs.push('property-docs');
+    // 4. Generate Trust Documents (60-day notices)
+    if (caseData.generate_60day) {
+      console.log('Generating trust documents (60-day notices)...');
+      const trustResult = await callFunction('generate-trust-documents', {
+        ...caseData,
+        generate_receipt: true,
+        generate_waiver: true,
+        generate_60day_notice: true
+      });
+      
+      if (trustResult?.success && trustResult.documents) {
+        Object.assign(generatedDocs, trustResult.documents);
+        console.log('Trust documents added:', Object.keys(trustResult.documents).join(', '));
+      }
     }
     
-    // 5. Generate Distribution Documents if requested
+    // 5. Generate Distribution Documents
     if (caseData.generate_distribution_docs && caseData.beneficiaries?.length > 0) {
-      console.log('Generating distribution documents');
-      // Call distribution docs function
-      generatedDocs.push('distribution-docs');
+      console.log('Generating distribution documents...');
+      const distResult = await callFunction('generate-distribution-docs', {
+        ...caseData,
+        generate_waiver: true,
+        generate_release: true,
+        generate_receipt: true,
+        generate_letter: true
+      });
+      
+      if (distResult?.success && distResult.documents) {
+        Object.assign(generatedDocs, distResult.documents);
+        console.log('Distribution documents added:', Object.keys(distResult.documents).join(', '));
+      }
     }
     
   } catch (error) {
-    console.error('Error generating initial documents:', error);
+    console.error('Error in document generation:', error);
+  }
+  
+  console.log('Total documents generated:', Object.keys(generatedDocs).length);
+  if (Object.keys(generatedDocs).length > 0) {
+    console.log('Documents generated:', Object.keys(generatedDocs).join(', '));
   }
   
   return generatedDocs;
@@ -176,6 +248,8 @@ exports.handler = async (event, context) => {
       decedent_last_name: formData.decedent_last_name,
       decedent_full_name: formData.decedent_name || 
         `${formData.decedent_first_name} ${formData.decedent_middle_name || ''} ${formData.decedent_last_name}`.trim(),
+      decedent_name: formData.decedent_name ||
+        `${formData.decedent_first_name} ${formData.decedent_middle_name || ''} ${formData.decedent_last_name}`.trim(),
       death_date: formData.death_date,
       death_place: formData.death_place || '',
       ssn_last4: formData.ssn_last4 || '',
@@ -229,7 +303,7 @@ exports.handler = async (event, context) => {
       disabled_veteran: formData.disabled_veteran || false,
       document_number: formData.document_number || '',
       purchase_price: formData.purchase_price || '0',
-      principal_residence: formData.principal_residence || false,
+      principal_residence: formData.principal_residence || formData.was_principal_residence || false,
       
       // === BUYER/TRANSFEREE INFO (for BOE forms) ===
       buyer_name: formData.buyer_name || formData.trustee_name,
@@ -302,11 +376,23 @@ exports.handler = async (event, context) => {
       throw new Error('Failed to save case data');
     }
     
-    // Generate initial documents if requested
-    let documentsGenerated = [];
+    // Generate initial documents if requested - THIS IS THE KEY PART
+    let documentsGenerated = {};
+    let documentsList = [];
+    
     if (formData.generate_initial_docs) {
-      console.log('Generating initial documents...');
+      console.log('Starting document generation process...');
+      console.log('Flags:', {
+        generate_60day: caseData.generate_60day,
+        generate_gov_notices: caseData.generate_gov_notices,
+        generate_boe_forms: caseData.generate_boe_forms,
+        generate_property_docs: caseData.generate_property_docs,
+        generate_distribution_docs: caseData.generate_distribution_docs
+      });
+      
       documentsGenerated = await generateInitialDocuments(caseData);
+      documentsList = Object.keys(documentsGenerated);
+      console.log('Documents generated list:', documentsList);
     }
     
     // Prepare response
@@ -324,7 +410,9 @@ exports.handler = async (event, context) => {
         properties_count: caseData.real_property?.length || 0,
         beneficiaries_count: caseData.beneficiaries?.length || 0
       },
-      documents_generated: documentsGenerated,
+      documents: documentsGenerated,  // Include actual PDF data
+      documents_generated: documentsList,  // List of document names
+      documents_count: documentsList.length,  // Count of documents
       next_steps: [
         `60-day notice must be sent by ${deadlines.sixty_day_notice}`,
         'Gather certified death certificates',
@@ -342,11 +430,17 @@ exports.handler = async (event, context) => {
       response.next_steps.push('File BOE forms for property tax reassessment');
     }
     
-    if (caseData.estate_value && parseFloat(caseData.estate_value.replace(/[^0-9.-]/g, '')) > 12920000) {
-      response.next_steps.push('Prepare Federal Estate Tax Return (Form 706)');
+    // Fix the estate value parsing
+    if (caseData.estate_value) {
+      const estateString = String(caseData.estate_value);
+      const estateNumber = parseFloat(estateString.replace(/[^0-9.]/g, ''));
+      if (!isNaN(estateNumber) && estateNumber > 12920000) {
+        response.next_steps.push('Prepare Federal Estate Tax Return (Form 706)');
+      }
     }
     
     console.log('Case created successfully:', caseNumber);
+    console.log('Total documents in response:', response.documents_count);
     
     return {
       statusCode: 200,
@@ -375,4 +469,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-
