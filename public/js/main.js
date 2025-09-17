@@ -1,530 +1,385 @@
-// public/js/main.js
-// Law Offices of Rozsa Gyene - Trust Administration Automation System
+let scrollPosition = 0;
 
-// Main Application Controller
-const TrustAdminApp = {
-  // API Base URL (will be set based on environment)
-  apiUrl: window.location.hostname === 'localhost' 
-    ? 'http://localhost:8888/.netlify/functions' 
-    : '/.netlify/functions',
-  
-  // Current case data
-  currentCase: null,
-  
-  // Initialize the application
-  init: function() {
-    console.log('Trust Administration System Initializing...');
-    this.setupEventListeners();
-    this.loadActiveCases();
-    this.checkDeadlines();
-  },
-  
-  // Setup all event listeners
-  setupEventListeners: function() {
-    // New case form
-    const newCaseBtn = document.getElementById('new-case-btn');
-    if (newCaseBtn) {
-      newCaseBtn.addEventListener('click', () => this.showNewCaseModal());
-    }
-    
-    // Modal close buttons
-    document.querySelectorAll('.modal-close, .btn-cancel').forEach(btn => {
-      btn.addEventListener('click', () => this.closeModal());
-    });
-    
-    // Click outside modal to close
-    document.querySelectorAll('.modal').forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          this.closeModal();
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById('current-date').textContent = now.toLocaleDateString();
+    document.getElementById('current-time').textContent = now.toLocaleTimeString();
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+async function loadCases() {
+    try {
+        const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+        const tbody = document.getElementById('cases-table');
+        
+        if (cases.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #6c757d;">
+                        No active cases. Click "New Trust Administration Case" to get started.
+                    </td>
+                </tr>
+            `;
+            return;
         }
-      });
-    });
-    
-    // Generate documents buttons
-    document.querySelectorAll('.generate-doc-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => this.generateDocument(e.target.dataset.docType));
-    });
-    
-    // Search functionality
-    const searchInput = document.getElementById('case-search');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => this.searchCases(e.target.value));
-    }
-    
-    // Form submissions
-    const caseForm = document.getElementById('new-case-form');
-    if (caseForm) {
-      caseForm.addEventListener('submit', (e) => this.handleNewCase(e));
-    }
-  },
-  
-  // Create a new case
-  handleNewCase: async function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const caseData = Object.fromEntries(formData.entries());
-    
-    // Show loading
-    this.showLoading('Creating new case...');
-    
-    try {
-      const response = await fetch(`${this.apiUrl}/create-trust-case`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(caseData)
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        this.showSuccess(`Case ${result.case_number} created successfully!`);
-        this.currentCase = result;
-        this.updateDashboard(result);
-        this.closeModal();
         
-        // Create Google Drive folder
-        await this.createDriveFolder(result.case_number, caseData.decedent_name);
+        tbody.innerHTML = cases.map(c => {
+            const deadlineDays = calculateDaysRemaining(c.deadlines.sixty_day_notice);
+            const deadlineClass = deadlineDays < 7 ? 'deadline-warning' : deadlineDays < 30 ? 'deadline-soon' : '';
+            const statusClass = deadlineDays < 7 ? 'status-urgent' : 'status-active';
+            const statusText = deadlineDays < 7 ? 'Notice Due' : 'In Progress';
+            
+            return `
+                <tr>
+                    <td>${c.case_number}</td>
+                    <td>${c.decedent_name}</td>
+                    <td>${c.trustee_name}</td>
+                    <td>${formatDate(c.death_date)}</td>
+                    <td class="${deadlineClass}">${formatDate(c.deadlines.sixty_day_notice)}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button onclick="viewCase('${c.case_number}')">View</button>
+                        <button onclick="generateDocs('${c.case_number}')">Generate Docs</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
         
-        // Add to Google Sheets
-        await this.addToSheets(result);
+        document.getElementById('active-cases').textContent = cases.length;
+        document.getElementById('pending-notices').textContent = cases.filter(c => 
+            calculateDaysRemaining(c.deadlines.sixty_day_notice) > 0
+        ).length;
         
-        // Refresh cases list
-        this.loadActiveCases();
-      } else {
-        this.showError('Failed to create case: ' + result.error);
-      }
     } catch (error) {
-      console.error('Error creating case:', error);
-      this.showError('Failed to create case. Please try again.');
-    } finally {
-      this.hideLoading();
+        console.error('Error loading cases:', error);
     }
-  },
-  
-  // Generate a document
-  generateDocument: async function(docType) {
-    if (!this.currentCase) {
-      this.showError('Please select or create a case first');
-      return;
-    }
-    
-    this.showLoading(`Generating ${docType}...`);
-    
+}
+
+async function loadDeadlines() {
     try {
-      // Determine which endpoint to use based on document type
-      let endpoint = '';
-      let requestData = { ...this.currentCase };
-      
-      switch(docType) {
-        case '60_day_notice':
-        case 'receipt_distributee':
-        case 'waiver_accounting':
-          endpoint = 'generate-trust-documents';
-          requestData.generate_60day_notice = docType === '60_day_notice';
-          requestData.generate_receipt = docType === 'receipt_distributee';
-          requestData.generate_waiver = docType === 'waiver_accounting';
-          break;
-          
-        case 'government_notices':
-          endpoint = 'generate-government-notices';
-          requestData.generate_all = true;
-          break;
-          
-        case 'distribution_package':
-          endpoint = 'generate-distribution-docs';
-          requestData.generate_all = true;
-          break;
-          
-        case 'property_docs':
-          endpoint = 'generate-property-documents';
-          requestData.generate_affidavit = true;
-          requestData.generate_trust_deed = true;
-          requestData.generate_certification = true;
-          break;
-          
-        case 'tax_forms':
-          endpoint = 'fill-official-boe-forms-complete';
-          requestData.generate_pcor = true;
-          requestData.generate_502d = true;
-          requestData.generate_19p = true;
-          break;
-          
-        default:
-          throw new Error('Unknown document type');
-      }
-      
-      const response = await fetch(`${this.apiUrl}/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      });
-      
-      const result = await response.json();
-      
-      if (result.success && result.documents) {
-        // Upload to Google Drive
-        await this.uploadToDrive(result.documents);
+        const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+        const tbody = document.getElementById('deadlines-table');
         
-        // Download documents
-        this.downloadDocuments(result.documents);
+        if (cases.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+                        No upcoming deadlines.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
         
-        this.showSuccess(`${docType} generated successfully!`);
+        const allDeadlines = [];
         
-        // Update Sheets tracking
-        await this.recordDocumentGeneration(docType);
-      } else {
-        this.showError('Failed to generate document: ' + result.error);
-      }
+        cases.forEach(c => {
+            if (c.deadlines) {
+                Object.entries(c.deadlines).forEach(([type, date]) => {
+                    if (date && calculateDaysRemaining(date) > 0) {
+                        allDeadlines.push({
+                            case_name: c.trust_name || c.decedent_name,
+                            case_number: c.case_number,
+                            type: formatDeadlineType(type),
+                            date: date,
+                            days: calculateDaysRemaining(date)
+                        });
+                    }
+                });
+            }
+        });
+        
+        allDeadlines.sort((a, b) => new Date(a.date) - new Date(b.date));
+        const upcomingDeadlines = allDeadlines.slice(0, 10);
+        
+        if (upcomingDeadlines.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+                        No upcoming deadlines.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = upcomingDeadlines.map(d => {
+            const deadlineClass = d.days < 7 ? 'deadline-warning' : d.days < 30 ? 'deadline-soon' : '';
+            return `
+                <tr>
+                    <td>${d.case_name}</td>
+                    <td>${d.type}</td>
+                    <td class="${deadlineClass}">${formatDate(d.date)}</td>
+                    <td class="${deadlineClass}">${d.days} days</td>
+                    <td><button onclick="handleDeadline('${d.case_number}', '${d.type}')">Take Action</button></td>
+                </tr>
+            `;
+        }).join('');
+        
+        document.getElementById('upcoming-deadlines').textContent = upcomingDeadlines.length;
+        
     } catch (error) {
-      console.error('Error generating document:', error);
-      this.showError('Failed to generate document. Please try again.');
-    } finally {
-      this.hideLoading();
+        console.error('Error loading deadlines:', error);
     }
-  },
-  
-  // Download generated documents
-  downloadDocuments: function(documents) {
-    Object.entries(documents).forEach(([docName, base64Data]) => {
-      // Create blob from base64
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${this.currentCase.case_number}_${docName}_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    });
-  },
-  
-  // Upload documents to Google Drive
-  uploadToDrive: async function(documents) {
+}
+
+async function loadRecentDocuments() {
     try {
-      const response = await fetch(`${this.apiUrl}/google-drive-integration/batch-upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          case_number: this.currentCase.case_number,
-          documents: documents
-        })
-      });
-      
-      const result = await response.json();
-      console.log('Documents uploaded to Drive:', result);
+        const docs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
+        const tbody = document.getElementById('recent-docs');
+        
+        if (docs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="2" style="text-align: center; padding: 20px; color: #6c757d;">
+                        No recent documents.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = docs.slice(0, 5).map(doc => `
+            <tr>
+                <td>${doc.name}</td>
+                <td><span class="status-badge ${doc.status === 'complete' ? 'status-active' : 'status-pending'}">${doc.status}</span></td>
+            </tr>
+        `).join('');
+        
+        const thisMonth = new Date().getMonth();
+        const thisMonthDocs = docs.filter(d => new Date(d.created).getMonth() === thisMonth);
+        document.getElementById('docs-generated').textContent = thisMonthDocs.length;
+        
     } catch (error) {
-      console.error('Error uploading to Drive:', error);
+        console.error('Error loading recent documents:', error);
     }
-  },
-  
-  // Create Google Drive folder for case
-  createDriveFolder: async function(caseNumber, decedentName) {
-    try {
-      const response = await fetch(`${this.apiUrl}/google-drive-integration/create-case-folder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          case_number: caseNumber,
-          decedent_name: decedentName
-        })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        console.log('Drive folder created:', result.case_folder_link);
-      }
-    } catch (error) {
-      console.error('Error creating Drive folder:', error);
-    }
-  },
-  
-  // Add case to Google Sheets
-  addToSheets: async function(caseData) {
-    try {
-      const response = await fetch(`${this.apiUrl}/google-sheets-integration/create-case`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(caseData)
-      });
-      
-      const result = await response.json();
-      console.log('Case added to Sheets:', result);
-    } catch (error) {
-      console.error('Error adding to Sheets:', error);
-    }
-  },
-  
-  // Record document generation in Sheets
-  recordDocumentGeneration: async function(docType) {
-    try {
-      await fetch(`${this.apiUrl}/google-sheets-integration/record-document`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          case_number: this.currentCase.case_number,
-          document_type: docType,
-          drive_link: '' // Will be filled by Drive integration
-        })
-      });
-    } catch (error) {
-      console.error('Error recording document generation:', error);
-    }
-  },
-  
-  // Load active cases
-  loadActiveCases: async function() {
-    try {
-      const response = await fetch(`${this.apiUrl}/google-sheets-integration/active-cases`);
-      const cases = await response.json();
-      
-      this.displayCases(cases);
-    } catch (error) {
-      console.error('Error loading cases:', error);
-      // Display empty table if error
-      this.displayCases([]);
-    }
-  },
-  
-  // Display cases in table
-  displayCases: function(cases) {
-    const tbody = document.querySelector('#cases-table tbody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (!cases || cases.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center">No cases found</td></tr>';
-      return;
-    }
-    
-    cases.forEach(caseData => {
-      const row = tbody.insertRow();
-      row.innerHTML = `
-        <td>${caseData.case_number || ''}</td>
-        <td>${caseData.decedent_name || ''}</td>
-        <td>${caseData.trustee_name || ''}</td>
-        <td><span class="badge badge-${this.getStatusClass(caseData.status)}">${caseData.status || 'Active'}</span></td>
-        <td>${this.formatDate(caseData['60_day_deadline'])}</td>
-        <td>
-          <button class="btn btn-sm btn-primary" onclick="TrustAdminApp.selectCase('${caseData.case_number}')">
-            Select
-          </button>
-        </td>
-      `;
-    });
-  },
-  
-  // Select a case to work with
-  selectCase: async function(caseNumber) {
-    try {
-      const response = await fetch(`${this.apiUrl}/google-sheets-integration/get-case?case_number=${caseNumber}`);
-      const caseData = await response.json();
-      
-      this.currentCase = caseData;
-      this.updateDashboard(caseData);
-      this.showSuccess(`Case ${caseNumber} selected`);
-    } catch (error) {
-      console.error('Error selecting case:', error);
-      this.showError('Failed to load case data');
-    }
-  },
-  
-  // Update dashboard with case info
-  updateDashboard: function(caseData) {
-    const dashboard = document.getElementById('case-dashboard');
-    if (!dashboard) return;
-    
-    dashboard.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Current Case: ${caseData.case_number}</h3>
-        </div>
-        <div class="card-body">
-          <p><strong>Decedent:</strong> ${caseData.decedent_name}</p>
-          <p><strong>Death Date:</strong> ${this.formatDate(caseData.death_date)}</p>
-          <p><strong>Trust:</strong> ${caseData.trust_name}</p>
-          <p><strong>Trustee:</strong> ${caseData.trustee_name}</p>
-          <p><strong>Status:</strong> <span class="badge badge-${this.getStatusClass(caseData.status)}">${caseData.status}</span></p>
-        </div>
-        <div class="card-footer">
-          <div class="btn-group">
-            <button class="btn btn-primary generate-doc-btn" data-doc-type="60_day_notice">60-Day Notice</button>
-            <button class="btn btn-primary generate-doc-btn" data-doc-type="government_notices">Government Notices</button>
-            <button class="btn btn-primary generate-doc-btn" data-doc-type="distribution_package">Distribution Docs</button>
-            <button class="btn btn-primary generate-doc-btn" data-doc-type="property_docs">Property Documents</button>
-            <button class="btn btn-primary generate-doc-btn" data-doc-type="tax_forms">Tax Forms</button>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Re-attach event listeners for new buttons
-    dashboard.querySelectorAll('.generate-doc-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => this.generateDocument(e.target.dataset.docType));
-    });
-  },
-  
-  // Check upcoming deadlines
-  checkDeadlines: async function() {
-    try {
-      const response = await fetch(`${this.apiUrl}/google-sheets-integration/upcoming-deadlines?days=30`);
-      const deadlines = await response.json();
-      
-      this.displayDeadlines(deadlines);
-    } catch (error) {
-      console.error('Error checking deadlines:', error);
-      this.displayDeadlines([]);
-    }
-  },
-  
-  // Display upcoming deadlines
-  displayDeadlines: function(deadlines) {
-    const container = document.getElementById('deadlines-container');
-    if (!container) return;
-    
-    if (!deadlines || deadlines.length === 0) {
-      container.innerHTML = '<p>No upcoming deadlines in the next 30 days.</p>';
-      return;
-    }
-    
-    let html = '<ul class="deadline-list">';
-    deadlines.forEach(deadline => {
-      const urgency = deadline.days_remaining <= 7 ? 'danger' : 
-                     deadline.days_remaining <= 14 ? 'warning' : 'info';
-      
-      html += `
-        <li class="deadline-item">
-          <span class="badge badge-${urgency}">${deadline.days_remaining} days</span>
-          <strong>${deadline.case_number}</strong> - ${deadline.deadline_type}
-          <br><small>Due: ${this.formatDate(deadline.due_date)}</small>
-        </li>
-      `;
-    });
-    html += '</ul>';
-    
-    container.innerHTML = html;
-  },
-  
-  // Search cases
-  searchCases: function(query) {
-    const rows = document.querySelectorAll('#cases-table tbody tr');
-    rows.forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = text.includes(query.toLowerCase()) ? '' : 'none';
-    });
-  },
-  
-  // Modal Functions - UPDATED WITH SCROLL LOCK
-  showModal: function(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      modal.classList.add('show');
-      document.body.classList.add('modal-open'); // Lock body scroll
-    }
-  },
-  
-  closeModal: function() {
-    document.querySelectorAll('.modal.show').forEach(modal => {
-      modal.classList.remove('show');
-    });
-    document.body.classList.remove('modal-open'); // Unlock body scroll
-  },
-  
-  showNewCaseModal: function() {
-    this.showModal('new-case-modal');
-  },
-  
-  // Loading overlay
-  showLoading: function(message = 'Loading...') {
-    const overlay = document.createElement('div');
-    overlay.className = 'loading-overlay';
-    overlay.innerHTML = `
-      <div class="text-center">
-        <div class="spinner"></div>
-        <p>${message}</p>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-  },
-  
-  hideLoading: function() {
-    const overlay = document.querySelector('.loading-overlay');
-    if (overlay) overlay.remove();
-  },
-  
-  // Alert functions
-  showSuccess: function(message) {
-    this.showAlert(message, 'success');
-  },
-  
-  showError: function(message) {
-    this.showAlert(message, 'danger');
-  },
-  
-  showAlert: function(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type}`;
-    alertDiv.textContent = message;
-    
-    const container = document.getElementById('alerts-container');
-    if (container) {
-      container.appendChild(alertDiv);
-    } else {
-      // If no alerts container, prepend to body
-      document.body.prepend(alertDiv);
-    }
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => alertDiv.remove(), 5000);
-  },
-  
-  // Utility Functions
-  formatDate: function(dateString) {
+}
+
+function formatDate(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-US');
-  },
-  
-  getStatusClass: function(status) {
-    if (!status) return 'info';
-    switch(status.toLowerCase()) {
-      case 'active': return 'info';
-      case 'completed': return 'success';
-      case 'pending': return 'warning';
-      case 'archived': return 'secondary';
-      default: return 'info';
-    }
-  }
-};
+    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+}
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-  TrustAdminApp.init();
+function calculateDaysRemaining(dateString) {
+    if (!dateString) return 0;
+    const deadline = new Date(dateString);
+    const today = new Date();
+    const diffTime = deadline - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+}
+
+function formatDeadlineType(type) {
+    const types = {
+        'sixty_day_notice': '60-Day Notice',
+        'contest_deadline': 'Contest Period Ends',
+        'creditor_claims': 'Creditor Claims Deadline',
+        'estate_tax_706': 'Estate Tax Return (706)',
+        'final_income_tax': 'Final Income Tax (1041)'
+    };
+    return types[type] || type;
+}
+
+function handleDeadline(caseNumber, deadlineType) {
+    if (deadlineType.includes('60-Day')) {
+        generate60DayNotice(caseNumber);
+    } else if (deadlineType.includes('Tax')) {
+        alert(`Preparing tax documents for case ${caseNumber}`);
+    } else {
+        alert(`Handling deadline: ${deadlineType} for case ${caseNumber}`);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    loadCases();
+    loadDeadlines();
+    loadRecentDocuments();
+    
+    setInterval(() => {
+        loadCases();
+        loadDeadlines();
+        loadRecentDocuments();
+    }, 60000);
 });
 
-// Export for use in other scripts if needed
-window.TrustAdminApp = TrustAdminApp;
+function openNewCaseModal() {
+    const modal = document.getElementById('newCaseModal');
+    scrollPosition = window.pageYOffset;
+    document.body.classList.add('modal-open');
+    document.body.style.top = `-${scrollPosition}px`;
+    modal.classList.add('show');
+    modal.style.display = 'block';
+}
+
+function closeNewCaseModal() {
+    const modal = document.getElementById('newCaseModal');
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, scrollPosition);
+    document.getElementById('quickIntakeForm').reset();
+    document.getElementById('success-msg').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+}
+
+document.getElementById('quickIntakeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('success-msg').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+    
+    const formData = {
+        decedent_first_name: document.getElementById('decedent-first').value,
+        decedent_last_name: document.getElementById('decedent-last').value,
+        death_date: document.getElementById('death-date').value,
+        ssn_last4: document.getElementById('ssn-last4').value,
+        marital_status: document.getElementById('marital-status').value,
+        trustee_name: document.getElementById('trustee-name').value,
+        trustee_phone: document.getElementById('trustee-phone').value,
+        trust_name: document.getElementById('trust-name').value,
+        trust_type: document.getElementById('trust-type').value,
+        estate_value: document.getElementById('estate-value').value,
+        initial_notes: document.getElementById('initial-notes').value,
+        generate_initial_docs: true
+    };
+    
+    try {
+        const response = await fetch('/.netlify/functions/create-trust-case', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            cases.push({
+                case_number: result.case_number,
+                decedent_name: `${formData.decedent_first_name} ${formData.decedent_last_name}`,
+                death_date: formData.death_date,
+                trustee_name: formData.trustee_name,
+                trust_name: formData.trust_name,
+                deadlines: result.case_data.deadlines,
+                created: new Date().toISOString()
+            });
+            localStorage.setItem('trust_cases', JSON.stringify(cases));
+            
+            document.getElementById('success-msg').textContent = `Case ${result.case_number} created successfully!`;
+            document.getElementById('success-msg').style.display = 'block';
+            
+            loadCases();
+            loadDeadlines();
+            
+            setTimeout(() => {
+                closeNewCaseModal();
+            }, 3000);
+        } else {
+            throw new Error(result.error || 'Failed to create case');
+        }
+    } catch (error) {
+        document.getElementById('error-msg').textContent = `Error: ${error.message}`;
+        document.getElementById('error-msg').style.display = 'block';
+    } finally {
+        document.getElementById('loading').style.display = 'none';
+    }
+});
+
+async function generateGovernmentNotices() {
+    const caseNumber = prompt('Enter Case Number (e.g., TA-2024-001):');
+    if (!caseNumber) return;
+    
+    try {
+        const response = await fetch('/.netlify/functions/generate-government-notices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ case_number: caseNumber })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            alert('Government notices generated successfully!');
+            downloadDocuments(result.documents, caseNumber);
+        }
+    } catch (error) {
+        alert('Error generating notices: ' + error.message);
+    }
+}
+
+function generateABTrustDocs() {
+    const caseNumber = prompt('Enter Case Number for A/B Trust Split:');
+    if (!caseNumber) return;
+    alert('A/B Trust split documents will be generated for case ' + caseNumber);
+}
+
+function generatePropertyDocs() {
+    const caseNumber = prompt('Enter Case Number for Property Documents:');
+    if (!caseNumber) return;
+    alert('Property documents will be generated for case ' + caseNumber);
+}
+
+function generateAccountingReport() {
+    const caseNumber = prompt('Enter Case Number for Trust Accounting:');
+    if (!caseNumber) return;
+    alert('Trust accounting report will be generated for case ' + caseNumber);
+}
+
+function downloadDocuments(documents, caseNumber) {
+    Object.entries(documents).forEach(([name, base64]) => {
+        const link = document.createElement('a');
+        link.href = 'data:application/pdf;base64,' + base64;
+        link.download = `${caseNumber}_${name}.pdf`;
+        link.click();
+    });
+}
+
+function viewCase(caseNumber) {
+    window.location.href = `/case-details.html?case=${caseNumber}`;
+}
+
+function generateDocs(caseNumber) {
+    const docType = prompt('Which documents to generate?\n1. 60-Day Notice\n2. Government Notices\n3. Property Docs\n4. All Documents');
+    
+    switch(docType) {
+        case '1':
+            generateNotices();
+            break;
+        case '2':
+            generateGovernmentNotices();
+            break;
+        case '3':
+            generatePropertyDocs();
+            break;
+        case '4':
+            alert('Generating all documents for case ' + caseNumber);
+            break;
+    }
+}
+
+function generateNotice(caseName) {
+    alert(`Generating 60-day notice for ${caseName} trust`);
+}
+
+function prepareTaxDocs(caseName) {
+    alert(`Preparing tax documents for ${caseName} estate`);
+}
+
+function generateNotices() {
+    const caseNumber = prompt('Enter Case Number for 60-Day Notices:');
+    if (!caseNumber) return;
+    alert('60-Day notices will be generated for case ' + caseNumber);
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        closeNewCaseModal();
+    }
+}
