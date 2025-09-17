@@ -14,8 +14,8 @@ function formatDate(dateString) {
 async function loadPDFFromDeployedSite(filename) {
   const fetch = (await import('node-fetch')).default;
   
-  // CORRECTED URL - using trustadministrationautomation
-  const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationautomation.netlify.app';
+  // CORRECTED URL - using trustadministration (without automation)
+  const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministration.netlify.app';
   const url = `${siteUrl}/templates/${filename}`;
   
   try {
