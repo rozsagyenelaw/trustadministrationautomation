@@ -1,94 +1,146 @@
-/ netlify/functions/fill-official-boe-forms.js
-// Fills official fillable BOE forms with actual field names
+// netlify/functions/fill-official-boe-forms-complete.js
+// Complete BOE form filler with actual field names extracted from the PDFs
 
 const { PDFDocument } = require('pdf-lib');
-const fs = require('fs').promises;
-const path = require('path');
+const fetch = require('node-fetch');
 
-// Fill BOE-502-A (PCOR) - Official Fillable Form
+// Fill BOE-502-A (PCOR) with actual field names
 async function fillPCOR(data) {
   try {
-    // Load the official fillable BOE-502-A PDF
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-502-A.pdf');
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    const siteUrl = process.env.URL || 'https://jeffbrandingtrusadmin.netlify.app';
+    const pdfUrl = `${siteUrl}/templates/BOE-502-A.pdf`;
     
-    // Get the form from the PDF
+    const response = await fetch(pdfUrl);
+    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
-    // Get all field names (for debugging/mapping)
-    const fields = form.getFields();
-    console.log('Available fields in PCOR:', fields.map(f => f.getName()));
-    
-    // Fill text fields - these are the actual field names in BOE-502-A
+    // Fill text fields with actual field names
     try {
-      // Buyer/Transferee Information
-      if (form.getTextField('topmostSubform[0].Page1[0].NAME_MAILING_ADDRESS_BUYER[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].NAME_MAILING_ADDRESS_BUYER[0]').setText(data.buyer_name || '');
+      // Buyer Information
+      if (data.buyer_name) {
+        form.getTextField('Name and mailing address of buyer/transferee').setText(data.buyer_name + '\n' + (data.buyer_address || ''));
       }
-      if (form.getTextField('topmostSubform[0].Page1[0].BUYER_ADDRESS[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].BUYER_ADDRESS[0]').setText(data.buyer_address || '');
+      if (data.buyer_zip) {
+        form.getTextField('ZIP code').setText(data.buyer_zip);
       }
-      if (form.getTextField('topmostSubform[0].Page1[0].APN[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].APN[0]').setText(data.apn || '');
+      if (data.apn) {
+        form.getTextField('Assessors parcel number').setText(data.apn);
       }
-      if (form.getTextField('topmostSubform[0].Page1[0].EMAIL[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].EMAIL[0]').setText(data.buyer_email || '');
+      if (data.buyer_email) {
+        form.getTextField("Buyer's email address").setText(data.buyer_email);
       }
-      if (form.getTextField('topmostSubform[0].Page1[0].PHONE[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].PHONE[0]').setText(data.buyer_phone || '');
-      }
-      
-      // Seller/Transferor
-      if (form.getTextField('topmostSubform[0].Page1[0].SELLER[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].SELLER[0]').setText(data.seller_name || '');
+      if (data.buyer_phone) {
+        form.getTextField("buyer's daytime telephone number1").setText(data.buyer_phone);
+        form.getTextField('area code').setText(data.buyer_area_code || '');
       }
       
-      // Property Address
-      if (form.getTextField('topmostSubform[0].Page1[0].PROPERTY_ADDRESS[0]')) {
-        form.getTextField('topmostSubform[0].Page1[0].PROPERTY_ADDRESS[0]').setText(data.property_address || '');
+      // Seller Information
+      if (data.seller_name) {
+        form.getTextField('seller transferor').setText(data.seller_name);
       }
       
-      // Principal Residence Checkbox
+      // Property Information
+      if (data.property_address) {
+        form.getTextField('street address or physical location of real property').setText(data.property_address);
+      }
+      if (data.property_city) {
+        form.getTextField('city').setText(data.property_city);
+      }
+      if (data.property_state) {
+        form.getTextField('state').setText(data.property_state || 'CA');
+      }
+      
+      // Principal Residence Question
       if (data.principal_residence === true) {
-        const yesBox = form.getCheckBox('topmostSubform[0].Page1[0].PRINCIPAL_RES_YES[0]');
-        if (yesBox) yesBox.check();
+        form.getCheckBox('This property is intended as my principal residence. If YES, please indicate the date of occupancy or intended occupancy Yes').check();
+        if (data.occupancy_date) {
+          const date = new Date(data.occupancy_date);
+          form.getTextField('Month').setText((date.getMonth() + 1).toString());
+          form.getTextField('day').setText(date.getDate().toString());
+          form.getTextField('year').setText(date.getFullYear().toString());
+        }
       } else if (data.principal_residence === false) {
-        const noBox = form.getCheckBox('topmostSubform[0].Page1[0].PRINCIPAL_RES_NO[0]');
-        if (noBox) noBox.check();
+        form.getCheckBox('This property is intended as my principal residence. If YES, please indicate the date of occupancy or intended occupancy_no').check();
       }
       
-      // Part 1 - Transfer Information
+      // Disabled Veteran Question  
+      if (data.disabled_veteran === true) {
+        form.getCheckBox('Are you a disabled veteran or an unmarried surviving spouse of a disabled veteran who was compensated at 100% by the Department of Veterans Affairs or an unmarried surviving spouse of a 100% rated disabled veteran? Yes').check();
+      } else if (data.disabled_veteran === false) {
+        form.getCheckBox('Are you a disabled veteran or an unmarried surviving spouse of a disabled veteran who was compensated at 100% by the Department of Veterans Affairs or an unmarried surviving spouse of a 100% rated disabled veteran? No').check();
+      }
+      
+      // Tax Mailing Information
+      if (data.tax_mail_name) {
+        form.getTextField('mail property tax information to (name)').setText(data.tax_mail_name);
+      }
+      if (data.tax_mail_address) {
+        form.getTextField('Mail property tax informatino to address').setText(data.tax_mail_address);
+      }
+      
+      // Part 1 - Transfer Type
       if (data.transfer_type === 'spouse') {
-        const spouseBox = form.getCheckBox('topmostSubform[0].Page1[0].PART1_A_YES[0]');
-        if (spouseBox) spouseBox.check();
+        form.getCheckBox('A. This transfer is solely between spouses (addition or removal of a spouse, death of a spouse, divorce settlement, etc.)­yes').check();
       } else if (data.transfer_type === 'parent_child') {
-        const parentChildBox = form.getCheckBox('topmostSubform[0].Page1[0].PART1_C_PARENT[0]');
-        if (parentChildBox) parentChildBox.check();
+        form.getCheckBox('C. This is a transfer between: parents and children or grandparents and grandchildren_yes').check();
+        form.getCheckBox('C. This is a transfer between parent(s) and child(ren)').check();
+        
+        // Principal Residence Transfer for Parent-Child
+        if (data.was_principal_residence === true) {
+          form.getCheckBox("Was this the transferor/grantor's principal residence? Yes").check();
+        } else if (data.was_principal_residence === false) {
+          form.getCheckBox("Was this the transferor/grantor's principal residence? No").check();
+        }
+        
+        // Family Farm Question
+        if (data.family_farm === true) {
+          form.getCheckBox('Is this a family farm? Yes').check();
+        } else if (data.family_farm === false) {
+          form.getCheckBox('Is this a family farm? No').check();
+        }
       } else if (data.transfer_type === 'trust') {
-        const trustBox = form.getCheckBox('topmostSubform[0].Page1[0].PART1_L_YES[0]');
-        if (trustBox) trustBox.check();
+        if (data.trust_type === 'revocable') {
+          form.getCheckBox('L1. This is a transfer of property to/from a revocable trust that may be revoked by the transferor and is for the benefit of the transferor and/or the transferor\'s spouse and/or registered domestic partner Yes').check();
+        } else if (data.trust_type === 'irrevocable') {
+          form.getCheckBox('L2. This is a transfer of property to/from an irrevocable trust for the benefit of the creator/grantor/trustor and/or grantor\'s trustor\'s spouse grantor\'s/trustor\'s registered domestic partner Yes').check();
+        }
+      } else if (data.transfer_type === 'cotenant_death') {
+        form.getCheckBox('D.This transfer is the result of a cotenant\'s death_yes').check();
+        if (data.death_date) {
+          form.getTextField('DATE OF DEATH').setText(data.death_date);
+        }
+      }
+      
+      // Purchase Information
+      if (data.purchase_price) {
+        form.getTextField('Total purchase price').setText(data.purchase_price.toString());
+      }
+      if (data.down_payment) {
+        form.getTextField('Cash down payment or value of trade or exchange excluding closing costs amount $').setText(data.down_payment.toString());
+      }
+      
+      // Signature Information
+      if (data.signer_name) {
+        form.getTextField('Name of buyer/transferee/personal representative/corporate officer (please print)').setText(data.signer_name);
+      }
+      if (data.signer_title) {
+        form.getTextField('title').setText(data.signer_title);
+      }
+      if (data.signer_email) {
+        form.getTextField('email address').setText(data.signer_email);
+      }
+      if (data.sign_date) {
+        form.getTextField('Date signed by buyer/transferee or corporate officer').setText(data.sign_date);
       }
       
     } catch (fieldError) {
-      console.error('Error filling field:', fieldError);
+      console.error('Error filling PCOR field:', fieldError);
     }
     
-    // Part 2 (Page 2) - Other Transfer Information
-    if (data.transfer_date) {
-      const dateField = form.getTextField('topmostSubform[0].Page2[0].TRANSFER_DATE[0]');
-      if (dateField) dateField.setText(data.transfer_date);
-    }
-    
-    // Part 3 - Purchase Price
-    if (data.purchase_price) {
-      const priceField = form.getTextField('topmostSubform[0].Page2[0].PURCHASE_PRICE[0]');
-      if (priceField) priceField.setText(data.purchase_price.toString());
-    }
-    
-    // Save the filled form
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling PCOR:', error);
@@ -96,61 +148,121 @@ async function fillPCOR(data) {
   }
 }
 
-// Fill BOE-502-D (Death of Real Property Owner) - Official Fillable Form
+// Fill BOE-502-D (Death of Real Property Owner) with actual field names
 async function fillBOE502D(data) {
   try {
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-502-D.pdf');
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    const siteUrl = process.env.URL || 'https://jeffbrandingtrusadmin.netlify.app';
+    const pdfUrl = `${siteUrl}/templates/BOE-502-D.pdf`;
     
+    const response = await fetch(pdfUrl);
+    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
-    // Get all field names for debugging
-    const fields = form.getFields();
-    console.log('Available fields in 502-D:', fields.map(f => f.getName()));
-    
-    // Fill the actual fields
     try {
-      // Decedent Information
-      if (form.getTextField('form1[0].#subform[0].DECEDENT_NAME[0]')) {
-        form.getTextField('form1[0].#subform[0].DECEDENT_NAME[0]').setText(data.decedent_name || '');
+      // Basic Information
+      if (data.name_address) {
+        form.getTextField('name and mailing address').setText(data.name_address);
       }
-      if (form.getTextField('form1[0].#subform[0].DATE_DEATH[0]')) {
-        form.getTextField('form1[0].#subform[0].DATE_DEATH[0]').setText(data.death_date || '');
+      if (data.apn) {
+        form.getTextField('APN of real property').setText(data.apn);
+      }
+      
+      // Decedent Information
+      if (data.decedent_name) {
+        form.getTextField('name of decedent').setText(data.decedent_name);
+      }
+      if (data.death_date) {
+        form.getTextField('date of death').setText(data.death_date);
       }
       
       // Property Information
-      if (form.getTextField('form1[0].#subform[0].STREET_ADDRESS[0]')) {
-        form.getTextField('form1[0].#subform[0].STREET_ADDRESS[0]').setText(data.property_address || '');
+      if (data.property_address) {
+        form.getTextField('street address of real property').setText(data.property_address);
       }
-      if (form.getTextField('form1[0].#subform[0].CITY[0]')) {
-        form.getTextField('form1[0].#subform[0].CITY[0]').setText(data.property_city || '');
+      if (data.property_city) {
+        form.getTextField('city of real property').setText(data.property_city);
       }
-      if (form.getTextField('form1[0].#subform[0].ZIP[0]')) {
-        form.getTextField('form1[0].#subform[0].ZIP[0]').setText(data.property_zip || '');
-      }
-      if (form.getTextField('form1[0].#subform[0].APN[0]')) {
-        form.getTextField('form1[0].#subform[0].APN[0]').setText(data.apn || '');
+      if (data.property_zip) {
+        form.getTextField('zip of real property').setText(data.property_zip);
       }
       
-      // Transfer checkboxes
+      // Transfer Type
       if (data.transfer_to === 'spouse') {
-        const spouseBox = form.getCheckBox('form1[0].#subform[0].SPOUSE[0]');
-        if (spouseBox) spouseBox.check();
+        form.getCheckBox('decedents spouse').check();
+      } else if (data.transfer_to === 'domestic_partner') {
+        form.getCheckBox('decedents registered domestic partner').check();
       } else if (data.transfer_to === 'child') {
-        const childBox = form.getCheckBox('form1[0].#subform[0].CHILD[0]');
-        if (childBox) childBox.check();
+        form.getCheckBox('decedents child or parent').check();
+      } else if (data.transfer_to === 'grandchild') {
+        form.getCheckBox('decedents grandchild').check();
       } else if (data.transfer_to === 'trust') {
-        const trustBox = form.getCheckBox('form1[0].#subform[0].TRUST[0]');
-        if (trustBox) trustBox.check();
+        form.getCheckBox('A trust').check();
+        if (data.trustee_name) {
+          form.getTextField('name of trustee').setText(data.trustee_name);
+        }
+        if (data.trustee_address) {
+          form.getTextField('address of trustee').setText(data.trustee_address);
+        }
+      } else if (data.transfer_to === 'cotenant') {
+        form.getCheckBox('Contenant to contenant').check();
+      }
+      
+      // Beneficiaries (up to 7)
+      if (data.beneficiaries && Array.isArray(data.beneficiaries)) {
+        data.beneficiaries.forEach((beneficiary, index) => {
+          if (index < 7) {
+            const num = index + 1;
+            if (beneficiary.name) {
+              form.getTextField(`beneficiary name ${num}`).setText(beneficiary.name);
+            }
+            if (beneficiary.relationship) {
+              form.getTextField(`relationship ${num}`).setText(beneficiary.relationship);
+            }
+            if (beneficiary.percent) {
+              form.getTextField(`percent received ${num}`).setText(beneficiary.percent.toString());
+            }
+          }
+        });
+      }
+      
+      // Principal Residence Question
+      if (data.was_principal_residence === true) {
+        form.getCheckBox("Was this the decendent's principal residence? Yes 1").check();
+      } else if (data.was_principal_residence === false) {
+        form.getCheckBox("Was this the decendent's principal residence? No 1").check();
+      }
+      
+      // Family Farm Question
+      if (data.family_farm === true) {
+        form.getCheckBox('Is this property a family farm? yes 1').check();
+      } else if (data.family_farm === false) {
+        form.getCheckBox('Is this property a family farm? no 1').check();
+      }
+      
+      // Contact Information
+      if (data.contact_name) {
+        form.getTextField('Name').setText(data.contact_name);
+        form.getTextField('printed name').setText(data.contact_name);
+      }
+      if (data.contact_phone) {
+        form.getTextField('telephone').setText(data.contact_phone);
+        form.getTextField('area code').setText(data.area_code || '');
+      }
+      if (data.contact_email) {
+        form.getTextField('email').setText(data.contact_email);
+      }
+      if (data.sign_date) {
+        form.getTextField('date').setText(data.sign_date);
       }
       
     } catch (fieldError) {
-      console.error('Error filling field:', fieldError);
+      console.error('Error filling BOE-502-D field:', fieldError);
     }
     
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling BOE-502-D:', error);
@@ -158,92 +270,156 @@ async function fillBOE502D(data) {
   }
 }
 
-// Fill BOE-19-P (Parent-Child Exclusion) - Official Fillable Form  
+// Fill BOE-19-P (Parent-Child Exclusion) with actual field names
 async function fillBOE19P(data) {
   try {
-    const templatePath = path.join(__dirname, '../../public/templates/BOE-19-P.pdf');
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    const siteUrl = process.env.URL || 'https://jeffbrandingtrusadmin.netlify.app';
+    const pdfUrl = `${siteUrl}/templates/BOE-19-P.pdf`;
     
+    const response = await fetch(pdfUrl);
+    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
-    // Get all field names for debugging
-    const fields = form.getFields();
-    console.log('Available fields in BOE-19-P:', fields.map(f => f.getName()));
-    
-    // Fill Section A - Property
     try {
-      if (form.getTextField('form1[0].#subform[0].APN[0]')) {
-        form.getTextField('form1[0].#subform[0].APN[0]').setText(data.apn || '');
+      // Property Information
+      if (data.apn) {
+        form.getTextField("Assessor's Parcel/ID Number").setText(data.apn);
       }
-      if (form.getTextField('form1[0].#subform[0].TRANSFER_DATE[0]')) {
-        form.getTextField('form1[0].#subform[0].TRANSFER_DATE[0]').setText(data.transfer_date || '');
+      if (data.property_address) {
+        form.getTextField('PROPERTY ADDRESS').setText(data.property_address);
       }
-      if (form.getTextField('form1[0].#subform[0].DOCUMENT_NUMBER[0]')) {
-        form.getTextField('form1[0].#subform[0].DOCUMENT_NUMBER[0]').setText(data.document_number || '');
+      if (data.property_city) {
+        form.getTextField('CITY').setText(data.property_city);
       }
-      if (form.getTextField('form1[0].#subform[0].PROPERTY_ADDRESS[0]')) {
-        form.getTextField('form1[0].#subform[0].PROPERTY_ADDRESS[0]').setText(data.property_address || '');
-      }
-      if (form.getTextField('form1[0].#subform[0].CITY[0]')) {
-        form.getTextField('form1[0].#subform[0].CITY[0]').setText(data.property_city || '');
+      if (data.county) {
+        form.getTextField('COUNTY').setText(data.county || 'LOS ANGELES');
       }
       
-      // Section B - Transferor(s)
-      if (form.getTextField('form1[0].#subform[0].TRANSFEROR1[0]')) {
-        form.getTextField('form1[0].#subform[0].TRANSFEROR1[0]').setText(data.transferor_name1 || '');
+      // Transfer Information
+      if (data.transfer_date) {
+        form.getTextField('DATE OF PURCHASE OR TRANSFER').setText(data.transfer_date);
       }
-      if (form.getTextField('form1[0].#subform[0].TRANSFEROR2[0]')) {
-        form.getTextField('form1[0].#subform[0].TRANSFEROR2[0]').setText(data.transferor_name2 || '');
+      if (data.document_number) {
+        form.getTextField('RECORDERS DOCUMENT NUMBER').setText(data.document_number);
       }
-      
-      // Section C - Transferee(s)
-      if (form.getTextField('form1[0].#subform[0].TRANSFEREE1[0]')) {
-        form.getTextField('form1[0].#subform[0].TRANSFEREE1[0]').setText(data.transferee_name1 || '');
-      }
-      if (form.getTextField('form1[0].#subform[0].TRANSFEREE2[0]')) {
-        form.getTextField('form1[0].#subform[0].TRANSFEREE2[0]').setText(data.transferee_name2 || '');
+      if (data.death_date) {
+        form.getTextField('DATE OF DEATH if applicable').setText(data.death_date);
       }
       
-      // Principal Residence checkbox
-      if (data.principal_residence === true) {
-        const prBox = form.getCheckBox('form1[0].#subform[0].PRINCIPAL_RES_YES[0]');
-        if (prBox) prBox.check();
+      // Transferor Information
+      if (data.transferor1_name) {
+        form.getTextField('Name').setText(data.transferor1_name);
+      }
+      if (data.transferor2_name) {
+        form.getTextField('Name_2').setText(data.transferor2_name);
+      }
+      if (data.transferor1_relationship) {
+        form.getTextField('Relationship').setText(data.transferor1_relationship);
+      }
+      if (data.transferor2_relationship) {
+        form.getTextField('Relationship_2').setText(data.transferor2_relationship);
+      }
+      
+      // Transferee Information  
+      if (data.transferee1_name) {
+        form.getTextField('Name_3').setText(data.transferee1_name);
+      }
+      if (data.transferee2_name) {
+        form.getTextField('Name_4').setText(data.transferee2_name);
+      }
+      if (data.transferee1_relationship) {
+        form.getTextField('Relationship_3').setText(data.transferee1_relationship);
+      }
+      if (data.transferee2_relationship) {
+        form.getTextField('Relationship_4').setText(data.transferee2_relationship);
+      }
+      
+      // Principal Residence Questions
+      if (data.was_transferor_principal_residence === true) {
+        form.getCheckBox('Was this property the transferor\'s principal residence Yes').check();
+      } else if (data.was_transferor_principal_residence === false) {
+        form.getCheckBox('Was this property the transferor\'s principal residence? No').check();
+      }
+      
+      if (data.is_transferee_principal_residence === true) {
+        form.getCheckBox('Is this property currently the transferee\'s principal residence? Yes').check();
         
         // Exemptions
         if (data.homeowners_exemption) {
-          const heBox = form.getCheckBox('form1[0].#subform[0].HOMEOWNERS[0]');
-          if (heBox) heBox.check();
+          form.getCheckBox('Homeowners Exemption').check();
         }
+        if (data.disabled_veterans_exemption) {
+          form.getCheckBox('Disabled Veterans Exemption').check();
+        }
+      } else if (data.is_transferee_principal_residence === false) {
+        form.getCheckBox('Is this property currently the transferee\'s principal residence? No').check();
+      }
+      
+      // Family Farm Questions
+      if (data.was_family_farm === true) {
+        form.getCheckBox('Was this property the transferor\'s family farm? Yes').check();
+      } else if (data.was_family_farm === false) {
+        form.getCheckBox('Was this property the transferor\'s family farm? No').check();
+      }
+      
+      if (data.is_family_farm === true) {
+        form.getCheckBox('Is this property the transferee\'s family farm? Yes').check();
+      } else if (data.is_family_farm === false) {
+        form.getCheckBox('Is this property the transferee\'s family farm? No').check();
+      }
+      
+      // Joint Tenancy
+      if (data.joint_tenancy === true) {
+        form.getCheckBox('Was this property owned in joint tenancy? Yes').check();
+      } else if (data.joint_tenancy === false) {
+        form.getCheckBox('Was this property owned in joint tenancy? No').check();
+      }
+      
+      // Partial Interest
+      if (data.partial_interest === true) {
+        form.getCheckBox('Was only a partial interest in the property transferred? Yes').check();
+        if (data.percentage_transferred) {
+          form.getTextField('If yes, percentage transferrred').setText(data.percentage_transferred.toString());
+        }
+      } else if (data.partial_interest === false) {
+        form.getCheckBox('Was only a partial interest in the property transferred? No').check();
+      }
+      
+      // Signature Section
+      if (data.signer1_name) {
+        form.getTextField('PRINTED NAME').setText(data.signer1_name);
+      }
+      if (data.signer2_name) {
+        form.getTextField('PRINTED NAME_2').setText(data.signer2_name);
+      }
+      if (data.sign_date) {
+        form.getTextField('DATE').setText(data.sign_date);
+        form.getTextField('DATE_2').setText(data.sign_date);
+      }
+      if (data.mailing_address) {
+        form.getTextField('MAILING ADDRESS').setText(data.mailing_address);
+      }
+      if (data.email_address) {
+        form.getTextField('EMAIL ADDRESS').setText(data.email_address);
+      }
+      if (data.phone_number) {
+        form.getTextField('DAYTIME PHONE NUMBER').setText(data.phone_number);
+        form.getTextField('DAYTIME PHONE NUMBER AREA CODE').setText(data.area_code || '');
       }
       
     } catch (fieldError) {
-      console.error('Error filling field:', fieldError);
+      console.error('Error filling BOE-19-P field:', fieldError);
     }
     
-    const pdfBytes = await pdfDoc.save();
-    return pdfBytes;
+    return await pdfDoc.save();
     
   } catch (error) {
     console.error('Error filling BOE-19-P:', error);
     throw error;
   }
-}
-
-// Helper function to list all form fields (for debugging)
-async function listFormFields(pdfPath) {
-  const existingPdfBytes = await fs.readFile(pdfPath);
-  const pdfDoc = await PDFDocument.load(existingPdfBytes);
-  const form = pdfDoc.getForm();
-  const fields = form.getFields();
-  
-  const fieldInfo = fields.map(field => ({
-    name: field.getName(),
-    type: field.constructor.name,
-    // Additional info if needed
-  }));
-  
-  return fieldInfo;
 }
 
 // Main handler
@@ -260,27 +436,22 @@ exports.handler = async (event, context) => {
     };
   }
   
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+  
   try {
     const data = JSON.parse(event.body);
-    
-    // Special debug mode to list fields
-    if (data.debug_list_fields) {
-      const pcorFields = await listFormFields(path.join(__dirname, '../../public/templates/BOE-502-A.pdf'));
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          pcor_fields: pcorFields
-        })
-      };
-    }
-    
     const documents = {};
     
-    // Fill requested forms
+    // Generate requested forms
     if (data.generate_pcor) {
       const pcorPdf = await fillPCOR(data);
       documents.pcor_filled = Buffer.from(pcorPdf).toString('base64');
@@ -305,7 +476,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         message: `Filled ${Object.keys(documents).length} official BOE forms`,
-        documents: documents
+        documents: documents,
+        case_number: data.case_number
       })
     };
     
@@ -318,7 +490,8 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        error: error.message
+        error: error.message,
+        stack: error.stack
       })
     };
   }
