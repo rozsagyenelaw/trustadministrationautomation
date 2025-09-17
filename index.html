@@ -413,6 +413,36 @@
             font-size: 12px;
         }
 
+        .delete-btn {
+            background: var(--danger-red);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .download-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .download-btn:hover {
+            background: #2a4a6f;
+        }
+
         .beneficiary-item, .property-item {
             background: var(--background);
             padding: 15px;
@@ -491,6 +521,16 @@
             margin: 0;
             color: #084298;
             font-size: 14px;
+        }
+
+        .doc-link {
+            color: var(--primary-blue);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .doc-link:hover {
+            color: var(--accent-gold);
         }
 
         @media (max-width: 768px) {
@@ -587,9 +627,16 @@
                 </div>
                 <div class="table-container">
                     <table>
+                        <thead>
+                            <tr>
+                                <th>Document Name</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody id="recent-docs">
                             <tr>
-                                <td colspan="2" style="text-align: center; padding: 20px; color: #6c757d;">
+                                <td colspan="3" style="text-align: center; padding: 20px; color: #6c757d;">
                                     No recent documents.
                                 </td>
                             </tr>
@@ -1099,6 +1146,41 @@
             downloadLink.click();
         }
         
+        // Helper function to download document from stored data
+        function downloadDocument(docData) {
+            if (docData && docData.base64) {
+                downloadPDF(docData.base64, docData.filename);
+            } else {
+                alert('Document data not available. Please regenerate the document.');
+            }
+        }
+        
+        // Delete case function
+        function deleteCase(caseNumber) {
+            if (confirm(`Are you sure you want to delete case ${caseNumber}? This action cannot be undone.`)) {
+                try {
+                    const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                    const updatedCases = cases.filter(c => c.case_number !== caseNumber);
+                    localStorage.setItem('trust_cases', JSON.stringify(updatedCases));
+                    
+                    // Also remove related documents
+                    const docs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
+                    const updatedDocs = docs.filter(d => !d.name.includes(caseNumber));
+                    localStorage.setItem('recent_documents', JSON.stringify(updatedDocs));
+                    
+                    // Reload the displays
+                    loadCases();
+                    loadDeadlines();
+                    loadRecentDocuments();
+                    
+                    alert(`Case ${caseNumber} has been deleted successfully.`);
+                } catch (error) {
+                    console.error('Error deleting case:', error);
+                    alert('Error deleting case. Please try again.');
+                }
+            }
+        }
+        
         // Update date and time
         function updateDateTime() {
             const now = new Date();
@@ -1263,6 +1345,7 @@
                             <td>
                                 <button onclick="viewCase('${c.case_number}')">View</button>
                                 <button onclick="generateDocsForCase('${c.case_number}')">Generate Docs</button>
+                                <button class="delete-btn" onclick="deleteCase('${c.case_number}')">Delete</button>
                             </td>
                         </tr>
                     `;
@@ -1349,7 +1432,7 @@
             }
         }
 
-        // Load recent documents
+        // Load recent documents with download capability
         async function loadRecentDocuments() {
             try {
                 const docs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
@@ -1358,7 +1441,7 @@
                 if (docs.length === 0) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="2" style="text-align: center; padding: 20px; color: #6c757d;">
+                            <td colspan="3" style="text-align: center; padding: 20px; color: #6c757d;">
                                 No recent documents.
                             </td>
                         </tr>
@@ -1366,10 +1449,21 @@
                     return;
                 }
                 
-                tbody.innerHTML = docs.slice(0, 5).map(doc => `
+                tbody.innerHTML = docs.slice(0, 10).map((doc, index) => `
                     <tr>
-                        <td>${doc.name}</td>
+                        <td>
+                            ${doc.downloadable ? 
+                                `<span class="doc-link" onclick="downloadStoredDocument(${index})">${doc.name}</span>` : 
+                                doc.name
+                            }
+                        </td>
                         <td><span class="status-badge ${doc.status === 'complete' ? 'status-active' : 'status-pending'}">${doc.status}</span></td>
+                        <td>
+                            ${doc.downloadable ? 
+                                `<button class="download-btn" onclick="downloadStoredDocument(${index})">Download</button>` :
+                                `<button onclick="regenerateDocument('${doc.case_number}', '${doc.type}')">Regenerate</button>`
+                            }
+                        </td>
                     </tr>
                 `).join('');
                 
@@ -1379,6 +1473,164 @@
                 
             } catch (error) {
                 console.error('Error loading recent documents:', error);
+            }
+        }
+        
+        // Download stored document
+        function downloadStoredDocument(index) {
+            const docs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
+            const doc = docs[index];
+            
+            if (doc && doc.base64) {
+                downloadPDF(doc.base64, doc.filename || doc.name);
+            } else if (doc && doc.case_number) {
+                // Try to regenerate if we have case data
+                regenerateDocument(doc.case_number, doc.type);
+            } else {
+                alert('Document not available. Please regenerate from the case.');
+            }
+        }
+        
+        // Regenerate document
+        function regenerateDocument(caseNumber, docType) {
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            const caseData = cases.find(c => c.case_number === caseNumber);
+            
+            if (!caseData) {
+                alert('Case data not found. Unable to regenerate document.');
+                return;
+            }
+            
+            // Determine which generator to call based on document type
+            if (docType.includes('BOE') || docType.includes('502') || docType.includes('19-P')) {
+                regenerateBOEForm(caseData, docType);
+            } else if (docType.includes('ftb') || docType.includes('irs') || docType.includes('dhcs') || docType.includes('ssa')) {
+                regenerateGovernmentNotice(caseData, docType);
+            } else if (docType.includes('sixty_day') || docType.includes('waiver') || docType.includes('receipt')) {
+                regenerateTrustDocument(caseData, docType);
+            } else if (docType.includes('affidavit') || docType.includes('deed') || docType.includes('certification')) {
+                regeneratePropertyDocument(caseData, docType);
+            } else {
+                alert('Unknown document type. Please regenerate from the case.');
+            }
+        }
+        
+        // Regenerate specific document types
+        async function regenerateBOEForm(caseData, docType) {
+            try {
+                const response = await fetch('/.netlify/functions/generate-boe-forms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseData.case_number,
+                        generate_pcor: docType.includes('502-A'),
+                        generate_502d: docType.includes('502-D'),
+                        generate_19p: docType.includes('19-P')
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.documents) {
+                        for (const [key, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseData.case_number}_${key}.pdf`);
+                        }
+                        alert('Document regenerated successfully!');
+                    }
+                }
+            } catch (error) {
+                console.error('Error regenerating BOE form:', error);
+                alert('Failed to regenerate document.');
+            }
+        }
+        
+        async function regenerateGovernmentNotice(caseData, agency) {
+            try {
+                const response = await fetch('/.netlify/functions/generate-government-notices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseData.case_number,
+                        agencies: [agency]
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.documents) {
+                        for (const [key, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseData.case_number}_${key}.pdf`);
+                        }
+                        alert('Document regenerated successfully!');
+                    }
+                }
+            } catch (error) {
+                console.error('Error regenerating government notice:', error);
+                alert('Failed to regenerate document.');
+            }
+        }
+        
+        async function regenerateTrustDocument(caseData, docType) {
+            try {
+                const response = await fetch('/.netlify/functions/generate-trust-documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseData.case_number,
+                        generate_60day_notice: docType.includes('sixty_day'),
+                        generate_waiver: docType.includes('waiver'),
+                        generate_receipt: docType.includes('receipt')
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.documents) {
+                        for (const [key, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseData.case_number}_${key}.pdf`);
+                        }
+                        alert('Document regenerated successfully!');
+                    }
+                }
+            } catch (error) {
+                console.error('Error regenerating trust document:', error);
+                alert('Failed to regenerate document.');
+            }
+        }
+        
+        async function regeneratePropertyDocument(caseData, docType) {
+            try {
+                const response = await fetch('/.netlify/functions/generate-property-documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        ...caseData,
+                        case_number: caseData.case_number,
+                        generate_affidavit: docType.includes('affidavit'),
+                        generate_trust_deed: docType.includes('deed'),
+                        generate_certification: docType.includes('certification')
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.documents) {
+                        for (const [key, pdfBase64] of Object.entries(result.documents)) {
+                            downloadPDF(pdfBase64, `${caseData.case_number}_${key}.pdf`);
+                        }
+                        alert('Document regenerated successfully!');
+                    }
+                }
+            } catch (error) {
+                console.error('Error regenerating property document:', error);
+                alert('Failed to regenerate document.');
             }
         }
 
@@ -1451,7 +1703,7 @@
             document.getElementById('error-msg').style.display = 'none';
         }
 
-        // FIXED Form submission handler
+        // Form submission handler
         document.getElementById('quickIntakeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -1461,12 +1713,19 @@
             document.getElementById('error-msg').style.display = 'none';
             
             try {
+                // Combine first, middle, and last names for decedent_name
+                const firstName = document.getElementById('decedent-first').value;
+                const middleName = document.getElementById('decedent-middle').value;
+                const lastName = document.getElementById('decedent-last').value;
+                const fullDecedentName = [firstName, middleName, lastName].filter(n => n).join(' ');
+                
                 // Collect ALL form data properly
                 const formData = {
                     // Decedent info
-                    decedent_first_name: document.getElementById('decedent-first').value,
-                    decedent_middle_name: document.getElementById('decedent-middle').value,
-                    decedent_last_name: document.getElementById('decedent-last').value,
+                    decedent_name: fullDecedentName,
+                    decedent_first_name: firstName,
+                    decedent_middle_name: middleName,
+                    decedent_last_name: lastName,
                     death_date: document.getElementById('death-date').value,
                     death_place: document.getElementById('death-place').value,
                     ssn_last4: document.getElementById('ssn-last4').value,
@@ -1491,6 +1750,7 @@
                     trustee_phone: document.getElementById('trustee-phone').value,
                     trustee_email: document.getElementById('trustee-email').value,
                     has_cotrustees: document.getElementById('has-cotrustees').checked,
+                    cotrustees: document.getElementById('has-cotrustees').checked,
                     
                     // Primary property (for BOE forms)
                     property_address: document.getElementById('property-address-1')?.value || '',
@@ -1600,6 +1860,7 @@
                 
                 // Step 2: Generate documents
                 const documentsGenerated = [];
+                const docsForStorage = [];
                 
                 // Generate BOE forms
                 if (formData.generate_boe_forms) {
@@ -1624,16 +1885,49 @@
                             
                             if (boeResult.success && boeResult.documents) {
                                 if (boeResult.documents.pcor) {
-                                    downloadPDF(boeResult.documents.pcor, `${caseNumber}_BOE-502-A.pdf`);
+                                    const filename = `${caseNumber}_BOE-502-A.pdf`;
+                                    downloadPDF(boeResult.documents.pcor, filename);
                                     documentsGenerated.push('BOE-502-A');
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - BOE-502-A`,
+                                        filename: filename,
+                                        base64: boeResult.documents.pcor,
+                                        status: 'complete',
+                                        type: 'BOE-502-A',
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                                 if (boeResult.documents.boe_502d) {
-                                    downloadPDF(boeResult.documents.boe_502d, `${caseNumber}_BOE-502-D.pdf`);
+                                    const filename = `${caseNumber}_BOE-502-D.pdf`;
+                                    downloadPDF(boeResult.documents.boe_502d, filename);
                                     documentsGenerated.push('BOE-502-D');
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - BOE-502-D`,
+                                        filename: filename,
+                                        base64: boeResult.documents.boe_502d,
+                                        status: 'complete',
+                                        type: 'BOE-502-D',
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                                 if (boeResult.documents.boe_19p) {
-                                    downloadPDF(boeResult.documents.boe_19p, `${caseNumber}_BOE-19-P.pdf`);
+                                    const filename = `${caseNumber}_BOE-19-P.pdf`;
+                                    downloadPDF(boeResult.documents.boe_19p, filename);
                                     documentsGenerated.push('BOE-19-P');
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - BOE-19-P`,
+                                        filename: filename,
+                                        base64: boeResult.documents.boe_19p,
+                                        status: 'complete',
+                                        type: 'BOE-19-P',
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                             }
                         }
@@ -1661,8 +1955,19 @@
                             const govResult = await govResponse.json();
                             if (govResult.success && govResult.documents) {
                                 for (const [agency, pdfBase64] of Object.entries(govResult.documents)) {
-                                    downloadPDF(pdfBase64, `${caseNumber}_${agency}.pdf`);
+                                    const filename = `${caseNumber}_${agency}.pdf`;
+                                    downloadPDF(pdfBase64, filename);
                                     documentsGenerated.push(agency);
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - ${agency}_notice`,
+                                        filename: filename,
+                                        base64: pdfBase64,
+                                        status: 'complete',
+                                        type: agency,
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                             }
                         }
@@ -1692,8 +1997,19 @@
                             const trustResult = await trustResponse.json();
                             if (trustResult.success && trustResult.documents) {
                                 for (const [docName, pdfBase64] of Object.entries(trustResult.documents)) {
-                                    downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                                    const filename = `${caseNumber}_${docName}.pdf`;
+                                    downloadPDF(pdfBase64, filename);
                                     documentsGenerated.push(docName);
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - ${docName}`,
+                                        filename: filename,
+                                        base64: pdfBase64,
+                                        status: 'complete',
+                                        type: docName,
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                             }
                         }
@@ -1720,6 +2036,9 @@
                                 // Add specific fields for property docs
                                 grantor_name: formData.trustee_name,
                                 grantor_address: formData.trustee_address,
+                                grantor_city: formData.trustee_city,
+                                grantor_state: formData.trustee_state,
+                                grantor_zip: formData.trustee_zip,
                                 surviving_trustee: formData.trustee_name,
                                 instrument_number: formData.document_number || '',
                                 deed_date: formData.transfer_date || ''
@@ -1730,8 +2049,19 @@
                             const propResult = await propResponse.json();
                             if (propResult.success && propResult.documents) {
                                 for (const [docName, pdfBase64] of Object.entries(propResult.documents)) {
-                                    downloadPDF(pdfBase64, `${caseNumber}_${docName}.pdf`);
+                                    const filename = `${caseNumber}_${docName}.pdf`;
+                                    downloadPDF(pdfBase64, filename);
                                     documentsGenerated.push(docName);
+                                    docsForStorage.push({
+                                        name: `${caseNumber} - ${docName}`,
+                                        filename: filename,
+                                        base64: pdfBase64,
+                                        status: 'complete',
+                                        type: docName,
+                                        case_number: caseNumber,
+                                        downloadable: true,
+                                        created: new Date().toISOString()
+                                    });
                                 }
                             }
                         }
@@ -1749,16 +2079,12 @@
                 `;
                 document.getElementById('success-msg').style.display = 'block';
                 
-                // Update recent documents
+                // Update recent documents with downloadable flag
                 const recentDocs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
-                documentsGenerated.forEach(docName => {
-                    recentDocs.unshift({
-                        name: `${caseNumber} - ${docName}`,
-                        status: 'complete',
-                        created: new Date().toISOString()
-                    });
+                docsForStorage.forEach(doc => {
+                    recentDocs.unshift(doc);
                 });
-                localStorage.setItem('recent_documents', JSON.stringify(recentDocs.slice(0, 50)));
+                localStorage.setItem('recent_documents', JSON.stringify(recentDocs.slice(0, 100))); // Keep last 100 docs
                 
                 // Reload the cases table
                 loadCases();
@@ -1963,27 +2289,61 @@
             const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
             const caseData = cases.find(c => c.case_number === caseNumber);
             if (caseData) {
-                alert(`Case Details:\n\nCase #: ${caseNumber}\nDecedent: ${caseData.decedent_name}\nTrustee: ${caseData.trustee_name}\nTrust: ${caseData.trust_name}`);
+                const details = `
+Case Details:
+━━━━━━━━━━━━━━━━━━━━━
+Case #: ${caseNumber}
+Decedent: ${caseData.decedent_name}
+Date of Death: ${formatDate(caseData.death_date)}
+Trustee: ${caseData.trustee_name}
+Trust: ${caseData.trust_name}
+
+Deadlines:
+- 60-Day Notice: ${formatDate(caseData.deadlines?.sixty_day_notice)}
+- Contest Period: ${formatDate(caseData.deadlines?.contest_deadline)}
+- Creditor Claims: ${formatDate(caseData.deadlines?.creditor_claims)}
+
+Notes: ${caseData.full_data?.initial_notes || 'None'}
+                `;
+                alert(details);
             }
         }
 
         function generateDocsForCase(caseNumber) {
-            const docType = prompt('Which documents to generate?\n1. BOE Forms\n2. Government Notices\n3. Property Docs\n4. All Documents');
+            const docType = prompt('Which documents to generate?\n1. BOE Forms\n2. Government Notices\n3. Property Docs\n4. Trust Documents\n5. All Documents');
+            
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            const caseData = cases.find(c => c.case_number === caseNumber);
+            
+            if (!caseData) {
+                alert('Case not found.');
+                return;
+            }
             
             switch(docType) {
                 case '1':
-                    // Set case number and call BOE generation
-                    document.getElementById('newCaseModal').style.display = 'none';
-                    generateBOEForms();
+                    regenerateBOEForm(caseData, 'all');
                     break;
                 case '2':
-                    generateGovernmentNotices();
+                    ['ftb', 'irs', 'dhcs', 'ssa'].forEach(agency => {
+                        regenerateGovernmentNotice(caseData, agency);
+                    });
                     break;
                 case '3':
-                    generatePropertyDocs();
+                    regeneratePropertyDocument(caseData, 'all');
                     break;
                 case '4':
+                    regenerateTrustDocument(caseData, 'all');
+                    break;
+                case '5':
                     alert('Generating all documents for case ' + caseNumber);
+                    // Generate all document types
+                    regenerateBOEForm(caseData, 'all');
+                    ['ftb', 'irs', 'dhcs', 'ssa'].forEach(agency => {
+                        regenerateGovernmentNotice(caseData, agency);
+                    });
+                    regeneratePropertyDocument(caseData, 'all');
+                    regenerateTrustDocument(caseData, 'all');
                     break;
             }
         }
