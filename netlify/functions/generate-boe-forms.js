@@ -10,23 +10,29 @@ function formatDate(dateString) {
   return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
 }
 
-// Load PDF from deployed Netlify site (matching conservatorship pattern)
+// Load PDF from deployed Netlify site
 async function loadPDFFromDeployedSite(filename) {
   const fetch = (await import('node-fetch')).default;
-  // UPDATE THIS URL to your deployed trust administration app URL
-  const url = `https://your-trust-admin-app.netlify.app/templates/${filename}`;
+  
+  // Use environment variable or your actual deployed URL
+  const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationgyene.netlify.app';
+  const url = `${siteUrl}/templates/${filename}`;
   
   try {
-    console.log(`Loading ${filename} from deployed site...`);
+    console.log(`Loading ${filename} from: ${url}`);
     const response = await fetch(url);
+    
     if (!response.ok) {
-      throw new Error(`Failed to load ${filename}: ${response.statusText}`);
+      console.error(`HTTP error! status: ${response.status} for ${url}`);
+      throw new Error(`Failed to load ${filename}: ${response.status} ${response.statusText}`);
     }
+    
     const buffer = await response.buffer();
+    console.log(`Successfully loaded ${filename}, size: ${buffer.length} bytes`);
     return buffer;
   } catch (error) {
-    console.error(`Error loading ${filename}:`, error);
-    throw error;
+    console.error(`Error loading ${filename}:`, error.message);
+    throw new Error(`Cannot load template ${filename}: ${error.message}`);
   }
 }
 
@@ -462,6 +468,7 @@ async function fillBOEForms(data) {
     
     try {
       console.log(`Processing ${name}...`);
+      // Add .pdf extension when loading
       const pdfBytes = await loadPDFFromDeployedSite(`${name}.pdf`);
       const filledPdf = await filler(data, pdfBytes);
       results[key] = Buffer.from(filledPdf).toString('base64');
@@ -469,16 +476,17 @@ async function fillBOEForms(data) {
     } catch (error) {
       console.error(`Error with ${name}:`, error);
       errors.push(`${name}: ${error.message}`);
-      // Continue processing other forms even if one fails
     }
   }
   
   return { results, errors };
 }
 
-// Main handler (matching conservatorship pattern)
+// Main handler
 exports.handler = async (event, context) => {
   console.log('Generate BOE Forms handler called');
+  console.log('Site URL:', process.env.URL || 'Not set');
+  console.log('Deploy URL:', process.env.DEPLOY_URL || 'Not set');
   
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
