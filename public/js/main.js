@@ -27,6 +27,20 @@ const TrustAdminApp = {
       newCaseBtn.addEventListener('click', () => this.showNewCaseModal());
     }
     
+    // Modal close buttons
+    document.querySelectorAll('.modal-close, .btn-cancel').forEach(btn => {
+      btn.addEventListener('click', () => this.closeModal());
+    });
+    
+    // Click outside modal to close
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          this.closeModal();
+        }
+      });
+    });
+    
     // Generate documents buttons
     document.querySelectorAll('.generate-doc-btn').forEach(btn => {
       btn.addEventListener('click', (e) => this.generateDocument(e.target.dataset.docType));
@@ -77,6 +91,9 @@ const TrustAdminApp = {
         
         // Add to Google Sheets
         await this.addToSheets(result);
+        
+        // Refresh cases list
+        this.loadActiveCases();
       } else {
         this.showError('Failed to create case: ' + result.error);
       }
@@ -130,7 +147,7 @@ const TrustAdminApp = {
           break;
           
         case 'tax_forms':
-          endpoint = 'generate-boe-forms';
+          endpoint = 'fill-official-boe-forms-complete';
           requestData.generate_pcor = true;
           requestData.generate_502d = true;
           requestData.generate_19p = true;
@@ -286,6 +303,8 @@ const TrustAdminApp = {
       this.displayCases(cases);
     } catch (error) {
       console.error('Error loading cases:', error);
+      // Display empty table if error
+      this.displayCases([]);
     }
   },
   
@@ -296,13 +315,18 @@ const TrustAdminApp = {
     
     tbody.innerHTML = '';
     
+    if (!cases || cases.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">No cases found</td></tr>';
+      return;
+    }
+    
     cases.forEach(caseData => {
       const row = tbody.insertRow();
       row.innerHTML = `
-        <td>${caseData.case_number}</td>
-        <td>${caseData.decedent_name}</td>
-        <td>${caseData.trustee_name}</td>
-        <td>${caseData.status}</td>
+        <td>${caseData.case_number || ''}</td>
+        <td>${caseData.decedent_name || ''}</td>
+        <td>${caseData.trustee_name || ''}</td>
+        <td><span class="badge badge-${this.getStatusClass(caseData.status)}">${caseData.status || 'Active'}</span></td>
         <td>${this.formatDate(caseData['60_day_deadline'])}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="TrustAdminApp.selectCase('${caseData.case_number}')">
@@ -372,6 +396,7 @@ const TrustAdminApp = {
       this.displayDeadlines(deadlines);
     } catch (error) {
       console.error('Error checking deadlines:', error);
+      this.displayDeadlines([]);
     }
   },
   
@@ -380,7 +405,7 @@ const TrustAdminApp = {
     const container = document.getElementById('deadlines-container');
     if (!container) return;
     
-    if (deadlines.length === 0) {
+    if (!deadlines || deadlines.length === 0) {
       container.innerHTML = '<p>No upcoming deadlines in the next 30 days.</p>';
       return;
     }
@@ -412,22 +437,27 @@ const TrustAdminApp = {
     });
   },
   
-  // UI Helper Functions
+  // Modal Functions - UPDATED WITH SCROLL LOCK
   showModal: function(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.classList.add('show');
+    if (modal) {
+      modal.classList.add('show');
+      document.body.classList.add('modal-open'); // Lock body scroll
+    }
   },
   
   closeModal: function() {
     document.querySelectorAll('.modal.show').forEach(modal => {
       modal.classList.remove('show');
     });
+    document.body.classList.remove('modal-open'); // Unlock body scroll
   },
   
   showNewCaseModal: function() {
     this.showModal('new-case-modal');
   },
   
+  // Loading overlay
   showLoading: function(message = 'Loading...') {
     const overlay = document.createElement('div');
     overlay.className = 'loading-overlay';
@@ -445,6 +475,7 @@ const TrustAdminApp = {
     if (overlay) overlay.remove();
   },
   
+  // Alert functions
   showSuccess: function(message) {
     this.showAlert(message, 'success');
   },
@@ -458,9 +489,15 @@ const TrustAdminApp = {
     alertDiv.className = `alert alert-${type}`;
     alertDiv.textContent = message;
     
-    const container = document.getElementById('alerts-container') || document.body;
-    container.appendChild(alertDiv);
+    const container = document.getElementById('alerts-container');
+    if (container) {
+      container.appendChild(alertDiv);
+    } else {
+      // If no alerts container, prepend to body
+      document.body.prepend(alertDiv);
+    }
     
+    // Auto-remove after 5 seconds
     setTimeout(() => alertDiv.remove(), 5000);
   },
   
@@ -468,10 +505,12 @@ const TrustAdminApp = {
   formatDate: function(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString('en-US');
   },
   
   getStatusClass: function(status) {
+    if (!status) return 'info';
     switch(status.toLowerCase()) {
       case 'active': return 'info';
       case 'completed': return 'success';
