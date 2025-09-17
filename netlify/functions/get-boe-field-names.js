@@ -1,30 +1,38 @@
-// netlify/functions/get-boe-field-names.js
-// This function reads the official BOE PDFs and returns all actual field names
+// netlify/functions/get-boe-field-names-fixed.js
+// Fixed version that works in Netlify's serverless environment
 
 const { PDFDocument } = require('pdf-lib');
-const fs = require('fs').promises;
-const path = require('path');
+const fetch = require('node-fetch');
 
 async function getFieldNames(formType) {
   try {
-    let templatePath;
+    let pdfUrl;
+    
+    // Construct the full URL to the PDF based on the site URL
+    const siteUrl = process.env.URL || 'https://jeffbrandingtrusadmin.netlify.app';
     
     switch(formType) {
       case 'PCOR':
-        templatePath = path.join(__dirname, '../../public/templates/BOE-502-A.pdf');
+        pdfUrl = `${siteUrl}/templates/BOE-502-A.pdf`;
         break;
       case '502D':
-        templatePath = path.join(__dirname, '../../public/templates/BOE-502-D.pdf');
+        pdfUrl = `${siteUrl}/templates/BOE-502-D.pdf`;
         break;
       case '19P':
-        templatePath = path.join(__dirname, '../../public/templates/BOE-19-P.pdf');
+        pdfUrl = `${siteUrl}/templates/BOE-19-P.pdf`;
         break;
       default:
         throw new Error('Invalid form type');
     }
     
-    const existingPdfBytes = await fs.readFile(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    // Fetch the PDF from the URL
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+    
+    const pdfBytes = await response.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     const fields = form.getFields();
     
@@ -37,16 +45,26 @@ async function getFieldNames(formType) {
       
       // Add additional info based on field type
       if (fieldType === 'PDFTextField') {
-        fieldDetails.maxLength = field.getMaxLength();
-        fieldDetails.isMultiline = field.isMultiline();
+        try {
+          fieldDetails.maxLength = field.getMaxLength();
+          fieldDetails.isMultiline = field.isMultiline();
+        } catch(e) {
+          // Some fields might not have these properties
+        }
       } else if (fieldType === 'PDFCheckBox') {
-        fieldDetails.isChecked = field.isChecked();
+        try {
+          fieldDetails.isChecked = field.isChecked();
+        } catch(e) {}
       } else if (fieldType === 'PDFRadioGroup') {
-        fieldDetails.options = field.getOptions();
-        fieldDetails.selected = field.getSelected();
+        try {
+          fieldDetails.options = field.getOptions();
+          fieldDetails.selected = field.getSelected();
+        } catch(e) {}
       } else if (fieldType === 'PDFDropdown') {
-        fieldDetails.options = field.getOptions();
-        fieldDetails.selected = field.getSelected();
+        try {
+          fieldDetails.options = field.getOptions();
+          fieldDetails.selected = field.getSelected();
+        } catch(e) {}
       }
       
       return fieldDetails;
@@ -75,21 +93,54 @@ async function getFieldNames(formType) {
 }
 
 exports.handler = async (event, context) => {
+  // Handle CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+  
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
   
   try {
-    const { form_type } = JSON.parse(event.body);
+    const { form_type } = JSON.parse(event.body || '{}');
     
     if (form_type === 'ALL') {
       // Get field names for all three forms
-      const pcorFields = await getFieldNames('PCOR');
-      const boe502dFields = await getFieldNames('502D');
-      const boe19pFields = await getFieldNames('19P');
+      const results = {};
+      
+      try {
+        results['BOE-502-A (PCOR)'] = await getFieldNames('PCOR');
+      } catch (e) {
+        results['BOE-502-A (PCOR)'] = { error: e.message };
+      }
+      
+      try {
+        results['BOE-502-D (Death)'] = await getFieldNames('502D');
+      } catch (e) {
+        results['BOE-502-D (Death)'] = { error: e.message };
+      }
+      
+      try {
+        results['BOE-19-P (Parent-Child)'] = await getFieldNames('19P');
+      } catch (e) {
+        results['BOE-19-P (Parent-Child)'] = { error: e.message };
+      }
       
       return {
         statusCode: 200,
@@ -97,11 +148,7 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({
-          'BOE-502-A (PCOR)': pcorFields,
-          'BOE-502-D (Death)': boe502dFields,
-          'BOE-19-P (Parent-Child)': boe19pFields
-        }, null, 2)
+        body: JSON.stringify(results, null, 2)
       };
     } else {
       const fields = await getFieldNames(form_type);
@@ -118,9 +165,14 @@ exports.handler = async (event, context) => {
   } catch (error) {
     return {
       statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({ 
         error: error.message,
-        note: 'Make sure the official PDFs are in public/templates folder'
+        stack: error.stack,
+        note: 'Make sure the PDFs are accessible at public/templates/'
       })
     };
   }
