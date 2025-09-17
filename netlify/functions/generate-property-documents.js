@@ -1,5 +1,5 @@
 // netlify/functions/generate-property-documents.js
-// FIXED VERSION - Properly uses input data
+// FIXED VERSION - Properly formatted Affidavit
 
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
@@ -20,7 +20,7 @@ function formatDate(dateString) {
   return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
 }
 
-// 1. GENERATE AFFIDAVIT - DEATH OF TRUSTEE
+// 1. GENERATE AFFIDAVIT - DEATH OF TRUSTEE - FIXED VERSION
 async function generateAffidavitDeathOfTrustee(data) {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([612, 792]);
@@ -159,6 +159,7 @@ async function generateAffidavitDeathOfTrustee(data) {
   });
   y -= 15;
   
+  // Add the middle line with SS. properly positioned
   page.drawText(')', {
     x: 250,
     y: y,
@@ -193,62 +194,130 @@ async function generateAffidavitDeathOfTrustee(data) {
   const trustName = data.trust_name || '[TRUST NAME]';
   const trustDate = formatDate(data.trust_date) || '[TRUST DATE]';
   const deathDate = formatDate(data.death_date);
-  const deedDate = formatDate(data.deed_date) || '[DEED DATE]';
-  const instrumentNumber = data.instrument_number || '[INSTRUMENT NUMBER]';
+  const deedDate = formatDate(data.deed_date) || formatDate(data.transfer_date) || '[DEED DATE]';
+  const instrumentNumber = data.instrument_number || data.document_number || '[INSTRUMENT NUMBER]';
   
-  const affidavitText = [
-    `${survivingTrustee.toUpperCase()}, of legal age, being first duly sworn, deposes and says:`,
-    ``,
-    `1. ${decedentName.toUpperCase()} is the decedent mentioned in the attached certified copy of`,
+  // Start the affidavit text
+  const affidavitText = `${survivingTrustee.toUpperCase()}, of legal age, being first duly sworn, deposes and says:`;
+  
+  page.drawText(affidavitText, {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  y -= 25;
+  
+  // Paragraph 1
+  page.drawText('1.', {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  
+  const para1Lines = [
+    `${decedentName.toUpperCase()} is the decedent mentioned in the attached certified copy of`,
     `Certificate of Death, and is the same person named as Trustee in ${trustName},`,
     `dated ${trustDate}, executed by ${decedentName} and ${survivingTrustee} as`,
-    `Trustor(s).`,
-    ``,
-    `2. At the time of decedent's death on ${deathDate}, decedent was the co-owner, as co-Trustee,`,
+    `Trustor(s).`
+  ];
+  
+  for (const line of para1Lines) {
+    page.drawText(line, {
+      x: 70,
+      y: y,
+      size: 11,
+      font: helvetica
+    });
+    y -= 18;
+  }
+  y -= 10;
+  
+  // Paragraph 2
+  page.drawText('2.', {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  
+  const para2Lines = [
+    `At the time of decedent's death on ${deathDate}, decedent was the co-owner, as co-Trustee,`,
     `of certain real property, located at ${propertyAddress}, ${propertyCity}, ${propertyState} ${propertyZip},`,
     `acquired by a deed recorded on ${deedDate} as Instrument No. ${instrumentNumber},`,
-    `in Official Records of ${county} County, California, describing the following real property:`,
-    ``,
-    `          See Exhibit "A" Legal Description`,
-    ``,
-    `     Commonly known as: ${propertyAddress}`,
-    `                         ${propertyCity}, ${propertyState} ${propertyZip}`,
-    ``,
-    `3. I am the surviving Trustee of the same Trust under which said decedent held title as`,
+    `in Official Records of ${county} County, California, describing the following real property:`
+  ];
+  
+  for (const line of para2Lines) {
+    page.drawText(line, {
+      x: 70,
+      y: y,
+      size: 11,
+      font: helvetica
+    });
+    y -= 18;
+  }
+  y -= 15;
+  
+  // Legal Description section
+  page.drawText('See Exhibit "A" Legal Description', {
+    x: 120,
+    y: y,
+    size: 11,
+    font: helveticaBold
+  });
+  y -= 25;
+  
+  page.drawText('Commonly known as:', {
+    x: 100,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  
+  page.drawText(propertyAddress, {
+    x: 220,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  y -= 18;
+  
+  page.drawText(`${propertyCity}, ${propertyState} ${propertyZip}`, {
+    x: 220,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  y -= 25;
+  
+  // Paragraph 3
+  page.drawText('3.', {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  
+  const para3Lines = [
+    `I am the surviving Trustee of the same Trust under which said decedent held title as`,
     `Trustee pursuant to the deed described above and am designated and empowered pursuant to the`,
     `terms of said Trust to serve as Trustee thereof.`
   ];
   
-  for (const line of affidavitText) {
-    let font = helvetica;
-    let xPos = 50;
-    
-    if (line.includes('See Exhibit')) {
-      font = helveticaBold;
-      xPos = 100;
-    } else if (line.includes('Commonly known')) {
-      xPos = 80;
-    } else if (line.trim().startsWith(propertyCity)) {
-      xPos = 80;
-    }
-    
+  for (const line of para3Lines) {
     page.drawText(line, {
-      x: xPos,
+      x: 70,
       y: y,
       size: 11,
-      font: font
+      font: helvetica
     });
     y -= 18;
-    
-    // Check if we need a new page
-    if (y < 100) {
-      const newPage = pdfDoc.addPage([612, 792]);
-      y = height - 50;
-    }
   }
   
   // Signature section
-  y -= 30;
+  y -= 40;
   page.drawText(`Dated: ${formatDate(new Date())}`, {
     x: 50,
     y: y,
@@ -279,13 +348,15 @@ async function generateAffidavitDeathOfTrustee(data) {
     font: helvetica
   });
   
-  // Notary section
-  y -= 40;
+  // Notary section - clean formatting
+  y -= 50;
+  
+  // Notary acknowledgment box
   page.drawRectangle({
     x: 50,
-    y: y - 80,
+    y: y - 60,
     width: width - 100,
-    height: 80,
+    height: 60,
     borderColor: rgb(0, 0, 0),
     borderWidth: 1
   });
@@ -304,13 +375,38 @@ async function generateAffidavitDeathOfTrustee(data) {
     font: helvetica
   });
   
-  y -= 100;
+  y -= 80;
   
-  // Notary acknowledgment
-  const notaryText = [
-    `State of California                           )`,
-    `County of ${county}                          ) SS.`,
-    ``,
+  // Notary acknowledgment text
+  page.drawText('State of California', {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  page.drawText(')', {
+    x: 200,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  y -= 15;
+  
+  page.drawText(`County of ${county}`, {
+    x: 50,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  page.drawText(') SS.', {
+    x: 200,
+    y: y,
+    size: 11,
+    font: helvetica
+  });
+  y -= 25;
+  
+  const notaryLines = [
     `On _____________, ${new Date().getFullYear()}, before me, _______________________________,`,
     `Notary Public, personally appeared ${survivingTrustee},`,
     `who proved to me on the basis of satisfactory evidence to be the person whose name is`,
@@ -321,13 +417,10 @@ async function generateAffidavitDeathOfTrustee(data) {
     `I certify under PENALTY OF PERJURY under the laws of the State of California that the`,
     `foregoing paragraph is true and correct.`,
     ``,
-    `WITNESS my hand and official seal.`,
-    ``,
-    ``,
-    `Signature_________________________________ (Seal)`
+    `WITNESS my hand and official seal.`
   ];
   
-  for (const line of notaryText) {
+  for (const line of notaryLines) {
     page.drawText(line, {
       x: 50,
       y: y,
@@ -337,7 +430,15 @@ async function generateAffidavitDeathOfTrustee(data) {
     y -= 15;
   }
   
-  // Footer
+  y -= 20;
+  page.drawText('Signature_________________________________ (Seal)', {
+    x: 50,
+    y: y,
+    size: 10,
+    font: helvetica
+  });
+  
+  // Footer at bottom
   page.drawText('ATTACH CERTIFIED COPY OF DEATH CERTIFICATE', {
     x: width / 2 - 140,
     y: 30,
