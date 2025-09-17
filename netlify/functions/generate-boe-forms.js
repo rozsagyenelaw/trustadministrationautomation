@@ -1,5 +1,5 @@
 // netlify/functions/generate-boe-forms.js
-// COMPLETE VERSION - Downloads templates from deployed site like conservatorship
+// COMPLETE VERSION - Fixed with correct URL
 
 const { PDFDocument } = require('pdf-lib');
 
@@ -14,8 +14,8 @@ function formatDate(dateString) {
 async function loadPDFFromDeployedSite(filename) {
   const fetch = (await import('node-fetch')).default;
   
-  // Use environment variable or your actual deployed URL
-  const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationgyene.netlify.app';
+  // CORRECTED URL - using trustadministrationautomation
+  const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationautomation.netlify.app';
   const url = `${siteUrl}/templates/${filename}`;
   
   try {
