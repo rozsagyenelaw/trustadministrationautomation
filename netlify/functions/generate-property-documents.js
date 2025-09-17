@@ -1,4 +1,5 @@
 // netlify/functions/generate-property-documents.js
+// FIXED VERSION - Properly uses input data
 
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
@@ -71,8 +72,12 @@ async function generateAffidavitDeathOfTrustee(data) {
   });
   y -= 15;
   
-  const survivingTrustee = data.surviving_trustee || '[SURVIVING TRUSTEE NAME]';
+  // Use actual data for surviving trustee
+  const survivingTrustee = data.surviving_trustee || data.trustee_name || '[SURVIVING TRUSTEE NAME]';
   const propertyAddress = data.property_address || '[PROPERTY ADDRESS]';
+  const propertyCity = data.property_city || '';
+  const propertyState = data.property_state || 'CA';
+  const propertyZip = data.property_zip || '';
   
   page.drawText(survivingTrustee.toUpperCase(), {
     x: 50,
@@ -88,7 +93,19 @@ async function generateAffidavitDeathOfTrustee(data) {
     size: 10,
     font: helvetica
   });
-  y -= 40;
+  y -= 15;
+  
+  if (propertyCity || propertyZip) {
+    page.drawText(`${propertyCity}, ${propertyState} ${propertyZip}`, {
+      x: 50,
+      y: y,
+      size: 10,
+      font: helvetica
+    });
+    y -= 25;
+  } else {
+    y -= 10;
+  }
   
   // Space for recorder's use
   page.drawLine({
@@ -156,7 +173,8 @@ async function generateAffidavitDeathOfTrustee(data) {
   });
   y -= 15;
   
-  page.drawText('COUNTY OF LOS ANGELES', {
+  const county = data.property_county || 'LOS ANGELES';
+  page.drawText(`COUNTY OF ${county.toUpperCase()}`, {
     x: 50,
     y: y,
     size: 11,
@@ -170,12 +188,12 @@ async function generateAffidavitDeathOfTrustee(data) {
   });
   y -= 30;
   
-  // Affidavit body
+  // Affidavit body with actual data
   const decedentName = data.decedent_name || '[DECEDENT NAME]';
   const trustName = data.trust_name || '[TRUST NAME]';
-  const trustDate = data.trust_date || '[TRUST DATE]';
+  const trustDate = formatDate(data.trust_date) || '[TRUST DATE]';
   const deathDate = formatDate(data.death_date);
-  const deedDate = data.deed_date || '[DEED DATE]';
+  const deedDate = formatDate(data.deed_date) || '[DEED DATE]';
   const instrumentNumber = data.instrument_number || '[INSTRUMENT NUMBER]';
   
   const affidavitText = [
@@ -183,17 +201,18 @@ async function generateAffidavitDeathOfTrustee(data) {
     ``,
     `1. ${decedentName.toUpperCase()} is the decedent mentioned in the attached certified copy of`,
     `Certificate of Death, and is the same person named as Trustee in ${trustName},`,
-    `dated ${trustDate} executed by ${decedentName} and ${survivingTrustee} as`,
+    `dated ${trustDate}, executed by ${decedentName} and ${survivingTrustee} as`,
     `Trustor(s).`,
     ``,
-    `2. At the time of decedent's death, decedent was the co-owner, as co-Trustee, of certain real`,
-    `property, located at ${propertyAddress}, acquired by a deed recorded on`,
-    `${deedDate} as Instrument No. ${instrumentNumber}, in Official Records of Los Angeles County,`,
-    `California, describing the following real property:`,
+    `2. At the time of decedent's death on ${deathDate}, decedent was the co-owner, as co-Trustee,`,
+    `of certain real property, located at ${propertyAddress}, ${propertyCity}, ${propertyState} ${propertyZip},`,
+    `acquired by a deed recorded on ${deedDate} as Instrument No. ${instrumentNumber},`,
+    `in Official Records of ${county} County, California, describing the following real property:`,
     ``,
     `          See Exhibit "A" Legal Description`,
     ``,
     `     Commonly known as: ${propertyAddress}`,
+    `                         ${propertyCity}, ${propertyState} ${propertyZip}`,
     ``,
     `3. I am the surviving Trustee of the same Trust under which said decedent held title as`,
     `Trustee pursuant to the deed described above and am designated and empowered pursuant to the`,
@@ -201,34 +220,36 @@ async function generateAffidavitDeathOfTrustee(data) {
   ];
   
   for (const line of affidavitText) {
+    let font = helvetica;
+    let xPos = 50;
+    
     if (line.includes('See Exhibit')) {
-      page.drawText(line, {
-        x: 100,
-        y: y,
-        size: 11,
-        font: helveticaBold
-      });
+      font = helveticaBold;
+      xPos = 100;
     } else if (line.includes('Commonly known')) {
-      page.drawText(line, {
-        x: 80,
-        y: y,
-        size: 11,
-        font: helvetica
-      });
-    } else {
-      page.drawText(line, {
-        x: 50,
-        y: y,
-        size: 11,
-        font: helvetica
-      });
+      xPos = 80;
+    } else if (line.trim().startsWith(propertyCity)) {
+      xPos = 80;
     }
+    
+    page.drawText(line, {
+      x: xPos,
+      y: y,
+      size: 11,
+      font: font
+    });
     y -= 18;
+    
+    // Check if we need a new page
+    if (y < 100) {
+      const newPage = pdfDoc.addPage([612, 792]);
+      y = height - 50;
+    }
   }
   
   // Signature section
   y -= 30;
-  page.drawText('Dated: ___________________________', {
+  page.drawText(`Dated: ${formatDate(new Date())}`, {
     x: 50,
     y: y,
     size: 11,
@@ -249,7 +270,7 @@ async function generateAffidavitDeathOfTrustee(data) {
     size: 10,
     font: helvetica
   });
-  y -= 5;
+  y -= 15;
   
   page.drawText(`Dated ${trustDate}`, {
     x: 300,
@@ -287,23 +308,33 @@ async function generateAffidavitDeathOfTrustee(data) {
   
   // Notary acknowledgment
   const notaryText = [
-    `Subscribed and sworn to (or affirmed) before me on this`,
-    `_______ day of ____________________, _______, by`,
-    `___________________________________________,`,
-    `proved to me on the basis of satisfactory evidence to`,
-    `be the person(s) who appeared before me.`,
+    `State of California                           )`,
+    `County of ${county}                          ) SS.`,
     ``,
-    `Signature_________________________________ (This area for notary stamp)`
+    `On _____________, ${new Date().getFullYear()}, before me, _______________________________,`,
+    `Notary Public, personally appeared ${survivingTrustee},`,
+    `who proved to me on the basis of satisfactory evidence to be the person whose name is`,
+    `subscribed to the within instrument and acknowledged to me that he/she executed the same`,
+    `in his/her authorized capacity, and that by his/her signature on the instrument the person,`,
+    `or the entity upon behalf of which the person acted, executed the instrument.`,
+    ``,
+    `I certify under PENALTY OF PERJURY under the laws of the State of California that the`,
+    `foregoing paragraph is true and correct.`,
+    ``,
+    `WITNESS my hand and official seal.`,
+    ``,
+    ``,
+    `Signature_________________________________ (Seal)`
   ];
   
   for (const line of notaryText) {
     page.drawText(line, {
       x: 50,
       y: y,
-      size: 11,
+      size: 10,
       font: helvetica
     });
-    y -= 18;
+    y -= 15;
   }
   
   // Footer
@@ -371,8 +402,12 @@ async function generateTrustTransferDeed(data) {
   });
   y -= 15;
   
-  const grantorName = data.grantor_name || '[GRANTOR NAME]';
-  const grantorAddress = data.grantor_address || '[GRANTOR ADDRESS]';
+  // Use actual data
+  const grantorName = data.grantor_name || data.trustee_name || '[GRANTOR NAME]';
+  const grantorAddress = data.grantor_address || data.trustee_address || '[GRANTOR ADDRESS]';
+  const grantorCity = data.grantor_city || data.trustee_city || '';
+  const grantorState = data.grantor_state || data.trustee_state || 'CA';
+  const grantorZip = data.grantor_zip || data.trustee_zip || '';
   
   coverPage.drawText(grantorName.toUpperCase(), {
     x: 50,
@@ -388,7 +423,17 @@ async function generateTrustTransferDeed(data) {
     size: 10,
     font: helvetica
   });
-  y -= 40;
+  y -= 15;
+  
+  if (grantorCity || grantorZip) {
+    coverPage.drawText(`${grantorCity}, ${grantorState} ${grantorZip}`, {
+      x: 50,
+      y: y,
+      size: 10,
+      font: helvetica
+    });
+    y -= 25;
+  }
   
   // Space for recorder
   coverPage.drawLine({
@@ -437,8 +482,10 @@ async function generateTrustTransferDeed(data) {
   
   y -= 20;
   
-  // Exemption checkboxes
-  coverPage.drawText('☐ Exempt from fee per GC 27388.1 (a) (2); recorded concurrently "in connection with" a transfer subject to the imposition', {
+  // Exemption checkboxes - mark the appropriate one based on data
+  const isOwnerOccupied = data.owner_occupied !== false;
+  
+  coverPage.drawText(`${!isOwnerOccupied ? '☒' : '☐'} Exempt from fee per GC 27388.1 (a) (2); recorded concurrently "in connection with" a transfer subject to the imposition`, {
     x: 50,
     y: y,
     size: 9,
@@ -454,7 +501,7 @@ async function generateTrustTransferDeed(data) {
   });
   y -= 20;
   
-  coverPage.drawText('☒ Exempt from fee per GC 27388.1 (a) (2); recorded concurrently "in connection with" a transfer of real property that is a', {
+  coverPage.drawText(`${isOwnerOccupied ? '☒' : '☐'} Exempt from fee per GC 27388.1 (a) (2); recorded concurrently "in connection with" a transfer of real property that is a`, {
     x: 50,
     y: y,
     size: 9,
@@ -498,12 +545,14 @@ async function generateTrustTransferDeed(data) {
       font: helvetica
     });
     
-    deedPage.drawText('Escrow No.', {
-      x: 300,
-      y: y,
-      size: 10,
-      font: helvetica
-    });
+    if (data.escrow_number) {
+      deedPage.drawText(`Escrow No. ${data.escrow_number}`, {
+        x: 300,
+        y: y,
+        size: 10,
+        font: helvetica
+      });
+    }
     y -= 30;
   }
   
@@ -539,7 +588,17 @@ async function generateTrustTransferDeed(data) {
     size: 10,
     font: helvetica
   });
-  y -= 40;
+  y -= 15;
+  
+  if (grantorCity || grantorZip) {
+    deedPage.drawText(`${grantorCity}, ${grantorState} ${grantorZip}`, {
+      x: 50,
+      y: y,
+      size: 10,
+      font: helvetica
+    });
+    y -= 25;
+  }
   
   // Recording info box
   const recordingBox = {
@@ -594,7 +653,8 @@ async function generateTrustTransferDeed(data) {
   });
   y -= 20;
   
-  deedPage.drawText('DOCUMENTARY TRANSFER TAX IS: $ _____0', {
+  const transferTax = data.transfer_tax || '0';
+  deedPage.drawText(`DOCUMENTARY TRANSFER TAX IS: $ ${transferTax}`, {
     x: 50,
     y: y,
     size: 10,
@@ -642,15 +702,22 @@ async function generateTrustTransferDeed(data) {
   });
   y -= 30;
   
-  // Grant language
+  // Grant language with actual data
   const trustName = data.trust_name || '[TRUST NAME]';
-  const trustDate = data.trust_date || '[TRUST DATE]';
+  const trustDate = formatDate(data.trust_date) || '[TRUST DATE]';
   const propertyCity = data.property_city || '[CITY]';
   const propertyCounty = data.property_county || 'LOS ANGELES';
+  const propertyAddress = data.property_address || '[PROPERTY ADDRESS]';
+  const maritalStatus = data.marital_status || 'SINGLE';
+  const gender = data.gender || 'PERSON';
   
-  const grantText = `Grantor(s) ${grantorName.toUpperCase()}, A ${data.marital_status || 'SINGLE'} ${data.gender === 'male' ? 'MAN' : 'WOMAN'} hereby GRANT(s) to ${grantorName.toUpperCase()},\n` +
+  let genderText = 'PERSON';
+  if (gender === 'male') genderText = 'MAN';
+  else if (gender === 'female') genderText = 'WOMAN';
+  
+  const grantText = `Grantor(s) ${grantorName.toUpperCase()}, A ${maritalStatus.toUpperCase()} ${genderText} hereby GRANT(s) to ${grantorName.toUpperCase()},\n` +
     `TRUSTEE OF THE ${trustName.toUpperCase()}, DATED ${trustDate.toUpperCase()},\n` +
-    `AND ANY AMENDMENTS THERETO the real property in the CITY OF ${propertyCity.toUpperCase()} County of ${propertyCounty.toUpperCase()},\n` +
+    `AND ANY AMENDMENTS THERETO the real property in the CITY OF ${propertyCity.toUpperCase()}, County of ${propertyCounty.toUpperCase()},\n` +
     `State of CA, described as:`;
   
   const grantLines = grantText.split('\n');
@@ -674,16 +741,25 @@ async function generateTrustTransferDeed(data) {
   });
   y -= 20;
   
-  const propertyAddress = data.property_address || '[PROPERTY ADDRESS]';
   deedPage.drawText(`ALSO KNOWN AS: ${propertyAddress}`, {
     x: 50,
     y: y,
     size: 10,
     font: helvetica
   });
+  
+  if (propertyCity || data.property_zip) {
+    y -= 15;
+    deedPage.drawText(`                ${propertyCity}, ${data.property_state || 'CA'} ${data.property_zip || ''}`, {
+      x: 50,
+      y: y,
+      size: 10,
+      font: helvetica
+    });
+  }
   y -= 30;
   
-  deedPage.drawText(`Dated: ${data.deed_date || formatDate(new Date())}`, {
+  deedPage.drawText(`Dated: ${formatDate(data.deed_date || new Date())}`, {
     x: 50,
     y: y,
     size: 10,
@@ -720,6 +796,9 @@ async function generateCertificationOfTrust(data) {
   
   let y = height - 50;
   
+  // Use actual trust name
+  const trustName = data.trust_name || '[TRUST NAME]';
+  
   // Title
   page.drawText('Certification of Trust for the', {
     x: width / 2 - 90,
@@ -729,18 +808,17 @@ async function generateCertificationOfTrust(data) {
   });
   y -= 20;
   
-  const trustName = data.trust_name || '[TRUST NAME]';
   page.drawText(trustName, {
-    x: width / 2 - 60,
+    x: width / 2 - (trustName.length * 4),
     y: y,
     size: 16,
     font: helveticaBold
   });
   y -= 40;
   
-  // Introduction
-  const trustDate = data.trust_date || '[TRUST DATE]';
-  const trusteeName = data.trustee_name || '[TRUSTEE NAME]';
+  // Introduction with actual data
+  const trustDate = formatDate(data.trust_date) || '[TRUST DATE]';
+  const trusteeName = data.trustee_name || data.surviving_trustee || '[TRUSTEE NAME]';
   
   const introText = `Under California Probate Code § 18100.5, this Certification of Trust is signed by all the currently\n` +
     `acting Trustee of ${trustName}, dated ${trustDate}, who declare as\n` +
@@ -758,16 +836,16 @@ async function generateCertificationOfTrust(data) {
   }
   y -= 10;
   
-  // Numbered items
-  const grantorName = data.grantor_name || '[GRANTOR NAME]';
+  // Numbered items with actual data
+  const grantorName = data.grantor_name || data.decedent_name || '[GRANTOR NAME]';
   const deathDate = formatDate(data.death_date);
   const taxId = data.trust_tax_id || '[TAX ID]';
   
   const certItems = [
     {
       number: '1.',
-      text: `The Grantor of the trust is ${grantorName}. ${grantorName} passed away on ${deathDate}.\n` +
-            `At that point the trust became irrevocable.`
+      text: `The Grantor of the trust is ${grantorName}.${data.death_date ? ` ${grantorName} passed away on ${deathDate}.\n` +
+            `At that point the trust became irrevocable.` : ''}`
     },
     {
       number: '2.',
@@ -848,7 +926,7 @@ async function generateCertificationOfTrust(data) {
   
   // Signature
   y -= 20;
-  page.drawText(`_______________, ${new Date().getFullYear()}`, {
+  page.drawText(`Date: ${formatDate(new Date())}`, {
     x: 50,
     y: y,
     size: 11,
@@ -925,6 +1003,8 @@ async function generateCertificationOfTrust(data) {
   y -= 80;
   
   // State and County
+  const county = data.property_county || 'Los Angeles';
+  
   notaryPage.drawText('State of California', {
     x: 50,
     y: y,
@@ -939,7 +1019,7 @@ async function generateCertificationOfTrust(data) {
   });
   y -= 15;
   
-  notaryPage.drawText('County of __________________________', {
+  notaryPage.drawText(`County of ${county}`, {
     x: 50,
     y: y,
     size: 11,
@@ -1000,6 +1080,8 @@ async function generateCertificationOfTrust(data) {
 
 // Main handler
 exports.handler = async (event, context) => {
+  console.log('Generate Property Documents handler called');
+  
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -1025,22 +1107,75 @@ exports.handler = async (event, context) => {
   
   try {
     const data = JSON.parse(event.body);
+    console.log('Input data received:', JSON.stringify(data, null, 2));
+    
     const documents = {};
+    const errors = [];
     
     // Generate requested documents
     if (data.generate_affidavit) {
-      const affidavitPdf = await generateAffidavitDeathOfTrustee(data);
-      documents.affidavit_death_of_trustee = Buffer.from(affidavitPdf).toString('base64');
+      try {
+        console.log('Generating Affidavit - Death of Trustee...');
+        const affidavitPdf = await generateAffidavitDeathOfTrustee(data);
+        documents.affidavit_death_of_trustee = Buffer.from(affidavitPdf).toString('base64');
+        console.log('Affidavit generated successfully');
+      } catch (error) {
+        console.error('Error generating affidavit:', error);
+        errors.push(`Affidavit: ${error.message}`);
+      }
     }
     
     if (data.generate_trust_deed) {
-      const deedPdf = await generateTrustTransferDeed(data);
-      documents.trust_transfer_deed = Buffer.from(deedPdf).toString('base64');
+      try {
+        console.log('Generating Trust Transfer Deed...');
+        const deedPdf = await generateTrustTransferDeed(data);
+        documents.trust_transfer_deed = Buffer.from(deedPdf).toString('base64');
+        console.log('Trust Transfer Deed generated successfully');
+      } catch (error) {
+        console.error('Error generating trust deed:', error);
+        errors.push(`Trust Deed: ${error.message}`);
+      }
     }
     
     if (data.generate_certification) {
-      const certPdf = await generateCertificationOfTrust(data);
-      documents.certification_of_trust = Buffer.from(certPdf).toString('base64');
+      try {
+        console.log('Generating Certification of Trust...');
+        const certPdf = await generateCertificationOfTrust(data);
+        documents.certification_of_trust = Buffer.from(certPdf).toString('base64');
+        console.log('Certification of Trust generated successfully');
+      } catch (error) {
+        console.error('Error generating certification:', error);
+        errors.push(`Certification: ${error.message}`);
+      }
+    }
+    
+    // Check if any documents were generated
+    if (Object.keys(documents).length === 0) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'No documents generated',
+          details: errors.length > 0 ? errors : 'No documents were requested for generation'
+        })
+      };
+    }
+    
+    const response = {
+      success: true,
+      message: `Generated ${Object.keys(documents).length} property documents`,
+      documents: documents,
+      case_number: data.case_number,
+      timestamp: new Date().toISOString()
+    };
+    
+    if (errors.length > 0) {
+      response.errors = errors;
+      response.message += ` (${errors.length} documents failed)`;
     }
     
     return {
@@ -1049,12 +1184,7 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({
-        success: true,
-        message: `Generated ${Object.keys(documents).length} property documents`,
-        documents: documents,
-        case_number: data.case_number
-      })
+      body: JSON.stringify(response)
     };
     
   } catch (error) {
@@ -1066,6 +1196,7 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
+        success: false,
         error: 'Failed to generate documents',
         details: error.message
       })
