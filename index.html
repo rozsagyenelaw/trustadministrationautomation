@@ -272,7 +272,7 @@
             margin: 20px auto;
             padding: 0;
             width: 90%;
-            max-width: 600px;
+            max-width: 900px;
             border-radius: 10px;
             position: relative;
             max-height: calc(100vh - 40px);
@@ -315,6 +315,26 @@
             flex: 1;
         }
 
+        .form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -347,6 +367,61 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
+        }
+
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .add-btn {
+            background: var(--accent-gold);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .add-btn:hover {
+            background: #b8982f;
+        }
+
+        .remove-btn {
+            background: var(--danger-red);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .beneficiary-item, .property-item {
+            background: var(--background);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .required {
+            color: var(--danger-red);
         }
 
         .submit-btn {
@@ -404,12 +479,26 @@
             margin-bottom: 20px;
         }
 
+        .info-box {
+            background: #cfe2ff;
+            border-left: 4px solid #0d6efd;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box p {
+            margin: 0;
+            color: #084298;
+            font-size: 14px;
+        }
+
         @media (max-width: 768px) {
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
             
-            .form-row {
+            .form-row, .form-row-3 {
                 grid-template-columns: 1fr;
             }
             
@@ -452,8 +541,8 @@
                     <button class="action-btn" onclick="generateGovernmentNotices()">
                         🏛️ Government Agency Notices
                     </button>
-                    <button class="action-btn green" onclick="generateABTrustDocs()">
-                        📑 A/B Trust Split Documents
+                    <button class="action-btn green" onclick="generateBOEForms()">
+                        📑 Generate BOE Tax Forms
                     </button>
                     <button class="action-btn" onclick="generatePropertyDocs()">
                         🏠 Real Property Documents
@@ -530,7 +619,6 @@
                         </tr>
                     </thead>
                     <tbody id="cases-table">
-                        <!-- Cases will be loaded dynamically -->
                         <tr>
                             <td colspan="7" style="text-align: center; padding: 20px; color: #6c757d;">
                                 No active cases. Click "New Trust Administration Case" to get started.
@@ -559,7 +647,6 @@
                         </tr>
                     </thead>
                     <tbody id="deadlines-table">
-                        <!-- Deadlines will be loaded dynamically -->
                         <tr>
                             <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
                                 No upcoming deadlines.
@@ -571,11 +658,11 @@
         </div>
     </div>
 
-    <!-- New Case Modal -->
+    <!-- COMPREHENSIVE New Case Modal with ALL Required Fields -->
     <div id="newCaseModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>New Trust Administration Case</h2>
+                <h2>New Trust Administration Case - Complete Intake</h2>
                 <button class="close-modal" onclick="closeNewCaseModal()">&times;</button>
             </div>
             
@@ -583,73 +670,406 @@
                 <div class="success-message" id="success-msg"></div>
                 <div class="error-message" id="error-msg"></div>
                 
+                <div class="info-box">
+                    <p>Complete all sections below to generate comprehensive trust administration documents including BOE forms, government notices, and distribution documents.</p>
+                </div>
+                
                 <form id="quickIntakeForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Decedent First Name *</label>
-                            <input type="text" id="decedent-first" required>
+                    <!-- SECTION 1: DECEDENT INFORMATION -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>👤</span> Decedent Information
+                        </h3>
+                        
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label>First Name <span class="required">*</span></label>
+                                <input type="text" id="decedent-first" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Middle Name</label>
+                                <input type="text" id="decedent-middle">
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name <span class="required">*</span></label>
+                                <input type="text" id="decedent-last" required>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Decedent Last Name *</label>
-                            <input type="text" id="decedent-last" required>
+                        
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label>Date of Death <span class="required">*</span></label>
+                                <input type="date" id="death-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Place of Death</label>
+                                <input type="text" id="death-place" placeholder="City, State">
+                            </div>
+                            <div class="form-group">
+                                <label>SSN (Last 4)</label>
+                                <input type="text" id="ssn-last4" maxlength="4" pattern="\d{4}" placeholder="XXXX">
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Date of Death *</label>
-                            <input type="date" id="death-date" required>
-                        </div>
-                        <div class="form-group">
-                            <label>SSN (Last 4)</label>
-                            <input type="text" id="ssn-last4" maxlength="4" pattern="\d{4}">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Marital Status at Death</label>
-                        <select id="marital-status">
-                            <option value="single">Single</option>
-                            <option value="married">Married</option>
-                            <option value="divorced">Divorced</option>
-                            <option value="widowed">Widowed</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Trustee Name *</label>
-                            <input type="text" id="trustee-name" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Trustee Phone</label>
-                            <input type="tel" id="trustee-phone">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Trust Name *</label>
-                        <input type="text" id="trust-name" placeholder="e.g., The John Smith Revocable Living Trust" required>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Trust Type</label>
-                            <select id="trust-type">
-                                <option value="single">Single Revocable Trust</option>
-                                <option value="joint">Joint Trust</option>
-                                <option value="ab">A/B Trust (needs split)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Estate Value (approx)</label>
-                            <input type="text" id="estate-value" placeholder="$">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Marital Status at Death</label>
+                                <select id="marital-status">
+                                    <option value="single">Single</option>
+                                    <option value="married">Married</option>
+                                    <option value="divorced">Divorced</option>
+                                    <option value="widowed">Widowed</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Gender</label>
+                                <select id="gender">
+                                    <option value="">Select...</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Initial Notes</label>
-                        <textarea id="initial-notes" rows="3"></textarea>
+                    <!-- SECTION 2: TRUST INFORMATION -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>📜</span> Trust Information
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label>Trust Name <span class="required">*</span></label>
+                            <input type="text" id="trust-name" placeholder="e.g., The John Smith Revocable Living Trust" required>
+                        </div>
+                        
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label>Trust Date</label>
+                                <input type="date" id="trust-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Trust Type</label>
+                                <select id="trust-type">
+                                    <option value="single">Single Revocable Trust</option>
+                                    <option value="joint">Joint Trust</option>
+                                    <option value="ab">A/B Trust (needs split)</option>
+                                    <option value="irrevocable">Irrevocable Trust</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Trust Tax ID</label>
+                                <input type="text" id="trust-tax-id" placeholder="XX-XXXXXXX">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Estate Value (approx)</label>
+                                <input type="text" id="estate-value" placeholder="$">
+                            </div>
+                            <div class="form-group">
+                                <label>Has Amendments?</label>
+                                <select id="has-amendments">
+                                    <option value="no">No</option>
+                                    <option value="yes">Yes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SECTION 3: SUCCESSOR TRUSTEE INFORMATION -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>👔</span> Successor Trustee Information
+                        </h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Trustee Name <span class="required">*</span></label>
+                                <input type="text" id="trustee-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Relationship to Decedent</label>
+                                <select id="trustee-relationship">
+                                    <option value="">Select...</option>
+                                    <option value="spouse">Spouse</option>
+                                    <option value="child">Child</option>
+                                    <option value="parent">Parent</option>
+                                    <option value="sibling">Sibling</option>
+                                    <option value="professional">Professional Trustee</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Trustee Address</label>
+                            <input type="text" id="trustee-address" placeholder="Street Address">
+                        </div>
+                        
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label>City</label>
+                                <input type="text" id="trustee-city">
+                            </div>
+                            <div class="form-group">
+                                <label>State</label>
+                                <input type="text" id="trustee-state" value="CA" maxlength="2">
+                            </div>
+                            <div class="form-group">
+                                <label>ZIP</label>
+                                <input type="text" id="trustee-zip" pattern="\d{5}(-\d{4})?">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" id="trustee-phone" placeholder="(XXX) XXX-XXXX">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="trustee-email">
+                            </div>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="has-cotrustees">
+                            <label for="has-cotrustees">Are there Co-Trustees?</label>
+                        </div>
+                    </div>
+                    
+                    <!-- SECTION 4: REAL PROPERTY INFORMATION -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>🏠</span> Real Property Information
+                        </h3>
+                        
+                        <div class="info-box">
+                            <p>Enter information for each property in the trust. This data will be used for BOE forms and property transfer documents.</p>
+                        </div>
+                        
+                        <div id="properties-container">
+                            <div class="property-item">
+                                <h4>Property 1 (Primary Residence)</h4>
+                                
+                                <div class="form-group">
+                                    <label>Property Address</label>
+                                    <input type="text" id="property-address-1" placeholder="123 Main Street">
+                                </div>
+                                
+                                <div class="form-row-3">
+                                    <div class="form-group">
+                                        <label>City</label>
+                                        <input type="text" id="property-city-1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>State</label>
+                                        <input type="text" id="property-state-1" value="CA">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>ZIP</label>
+                                        <input type="text" id="property-zip-1">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>County</label>
+                                        <input type="text" id="property-county-1" value="Los Angeles">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>APN (Assessor's Parcel Number)</label>
+                                        <input type="text" id="apn-1" placeholder="1234-567-890">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Property Type</label>
+                                        <select id="property-type-1">
+                                            <option value="single_family">Single Family Residence</option>
+                                            <option value="condo">Condominium</option>
+                                            <option value="multi_family">Multi-Family</option>
+                                            <option value="commercial">Commercial</option>
+                                            <option value="vacant">Vacant Land</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Estimated Value</label>
+                                        <input type="text" id="property-value-1" placeholder="$">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="was-principal-residence-1">
+                                        <label for="was-principal-residence-1">Was Decedent's Principal Residence</label>
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="family-farm-1">
+                                        <label for="family-farm-1">Family Farm</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="add-btn" onclick="addProperty()">+ Add Another Property</button>
+                    </div>
+                    
+                    <!-- SECTION 5: BENEFICIARIES -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>👥</span> Beneficiaries
+                        </h3>
+                        
+                        <div id="beneficiaries-container">
+                            <div class="beneficiary-item">
+                                <h4>Beneficiary 1</h4>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Name</label>
+                                        <input type="text" id="beneficiary-name-1" placeholder="Full Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Relationship</label>
+                                        <select id="beneficiary-relationship-1">
+                                            <option value="">Select...</option>
+                                            <option value="spouse">Spouse</option>
+                                            <option value="child">Child</option>
+                                            <option value="grandchild">Grandchild</option>
+                                            <option value="parent">Parent</option>
+                                            <option value="sibling">Sibling</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Share Percentage</label>
+                                        <input type="number" id="beneficiary-percent-1" min="0" max="100" placeholder="%">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Email</label>
+                                        <input type="email" id="beneficiary-email-1">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Mailing Address</label>
+                                    <textarea id="beneficiary-address-1" rows="2" placeholder="Full mailing address"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="add-btn" onclick="addBeneficiary()">+ Add Another Beneficiary</button>
+                    </div>
+                    
+                    <!-- SECTION 6: BOE FORM SPECIFIC DATA -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>📋</span> Tax & Transfer Information (for BOE Forms)
+                        </h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Transfer Type</label>
+                                <select id="transfer-type">
+                                    <option value="">Select...</option>
+                                    <option value="spouse">Transfer to Spouse</option>
+                                    <option value="parent_child">Parent to Child</option>
+                                    <option value="grandparent_grandchild">Grandparent to Grandchild</option>
+                                    <option value="trust">Transfer to Trust</option>
+                                    <option value="cotenant_death">Co-tenant Death</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Transfer Date</label>
+                                <input type="date" id="transfer-date">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="homeowners-exemption">
+                                <label for="homeowners-exemption">Claim Homeowner's Exemption</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="disabled-veteran">
+                                <label for="disabled-veteran">Disabled Veteran Exemption</label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Recording Document Number</label>
+                                <input type="text" id="document-number" placeholder="If known">
+                            </div>
+                            <div class="form-group">
+                                <label>Purchase Price (if applicable)</label>
+                                <input type="text" id="purchase-price" placeholder="$0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SECTION 7: ADDITIONAL INFORMATION -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span>📝</span> Additional Information
+                        </h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Fee Arrangement</label>
+                                <select id="fee-arrangement">
+                                    <option value="">Select...</option>
+                                    <option value="flat">Flat Fee</option>
+                                    <option value="hourly">Hourly</option>
+                                    <option value="percentage">Percentage of Estate</option>
+                                    <option value="statutory">Statutory Fee</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Urgency Level</label>
+                                <select id="urgency-level">
+                                    <option value="normal">Normal</option>
+                                    <option value="urgent">Urgent</option>
+                                    <option value="expedited">Expedited</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Initial Notes</label>
+                            <textarea id="initial-notes" rows="4" placeholder="Any special circumstances, instructions, or notes..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Documents to Generate</label>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gen-60day" checked>
+                                <label for="gen-60day">60-Day Notices (Probate Code 16061.7)</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gen-gov-notices" checked>
+                                <label for="gen-gov-notices">Government Notices (FTB, IRS, DHCS, SSA)</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gen-boe-forms" checked>
+                                <label for="gen-boe-forms">BOE Forms (502-A, 502-D, 19-P)</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gen-property-docs" checked>
+                                <label for="gen-property-docs">Property Documents (Affidavit, Trust Certification)</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gen-distribution-docs">
+                                <label for="gen-distribution-docs">Distribution Documents</label>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="loading" id="loading">
@@ -666,6 +1086,8 @@
     <script>
         // Store scroll position
         let scrollPosition = 0;
+        let propertyCount = 1;
+        let beneficiaryCount = 1;
         
         // Update date and time
         function updateDateTime() {
@@ -675,15 +1097,119 @@
         }
         setInterval(updateDateTime, 1000);
         updateDateTime();
+        
+        // Add another property
+        function addProperty() {
+            propertyCount++;
+            const container = document.getElementById('properties-container');
+            const propertyDiv = document.createElement('div');
+            propertyDiv.className = 'property-item';
+            propertyDiv.innerHTML = `
+                <h4>Property ${propertyCount}</h4>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+                
+                <div class="form-group">
+                    <label>Property Address</label>
+                    <input type="text" id="property-address-${propertyCount}" placeholder="Address">
+                </div>
+                
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>City</label>
+                        <input type="text" id="property-city-${propertyCount}">
+                    </div>
+                    <div class="form-group">
+                        <label>State</label>
+                        <input type="text" id="property-state-${propertyCount}" value="CA">
+                    </div>
+                    <div class="form-group">
+                        <label>ZIP</label>
+                        <input type="text" id="property-zip-${propertyCount}">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>County</label>
+                        <input type="text" id="property-county-${propertyCount}" value="Los Angeles">
+                    </div>
+                    <div class="form-group">
+                        <label>APN</label>
+                        <input type="text" id="apn-${propertyCount}">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Property Type</label>
+                        <select id="property-type-${propertyCount}">
+                            <option value="single_family">Single Family Residence</option>
+                            <option value="condo">Condominium</option>
+                            <option value="multi_family">Multi-Family</option>
+                            <option value="commercial">Commercial</option>
+                            <option value="vacant">Vacant Land</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estimated Value</label>
+                        <input type="text" id="property-value-${propertyCount}" placeholder="$">
+                    </div>
+                </div>
+            `;
+            container.appendChild(propertyDiv);
+        }
+        
+        // Add another beneficiary
+        function addBeneficiary() {
+            beneficiaryCount++;
+            const container = document.getElementById('beneficiaries-container');
+            const beneficiaryDiv = document.createElement('div');
+            beneficiaryDiv.className = 'beneficiary-item';
+            beneficiaryDiv.innerHTML = `
+                <h4>Beneficiary ${beneficiaryCount}</h4>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">Remove</button>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="beneficiary-name-${beneficiaryCount}" placeholder="Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Relationship</label>
+                        <select id="beneficiary-relationship-${beneficiaryCount}">
+                            <option value="">Select...</option>
+                            <option value="spouse">Spouse</option>
+                            <option value="child">Child</option>
+                            <option value="grandchild">Grandchild</option>
+                            <option value="parent">Parent</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Share Percentage</label>
+                        <input type="number" id="beneficiary-percent-${beneficiaryCount}" min="0" max="100" placeholder="%">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="beneficiary-email-${beneficiaryCount}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Mailing Address</label>
+                    <textarea id="beneficiary-address-${beneficiaryCount}" rows="2" placeholder="Full mailing address"></textarea>
+                </div>
+            `;
+            container.appendChild(beneficiaryDiv);
+        }
 
-        // Load cases from storage (localStorage for now, database in production)
+        // Load cases from storage
         async function loadCases() {
             try {
-                // In production, this would fetch from your database
-                // const response = await fetch('/.netlify/functions/get-cases');
-                // const cases = await response.json();
-                
-                // For now, load from localStorage
                 const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
                 
                 const tbody = document.getElementById('cases-table');
@@ -700,7 +1226,7 @@
                 }
                 
                 tbody.innerHTML = cases.map(c => {
-                    const deadlineDays = calculateDaysRemaining(c.deadlines.sixty_day_notice);
+                    const deadlineDays = calculateDaysRemaining(c.deadlines?.sixty_day_notice);
                     const deadlineClass = deadlineDays < 7 ? 'deadline-warning' : deadlineDays < 30 ? 'deadline-soon' : '';
                     const statusClass = deadlineDays < 7 ? 'status-urgent' : 'status-active';
                     const statusText = deadlineDays < 7 ? 'Notice Due' : 'In Progress';
@@ -711,11 +1237,11 @@
                             <td>${c.decedent_name}</td>
                             <td>${c.trustee_name}</td>
                             <td>${formatDate(c.death_date)}</td>
-                            <td class="${deadlineClass}">${formatDate(c.deadlines.sixty_day_notice)}</td>
+                            <td class="${deadlineClass}">${formatDate(c.deadlines?.sixty_day_notice)}</td>
                             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                             <td>
                                 <button onclick="viewCase('${c.case_number}')">View</button>
-                                <button onclick="generateDocs('${c.case_number}')">Generate Docs</button>
+                                <button onclick="generateDocsForCase('${c.case_number}')">Generate Docs</button>
                             </td>
                         </tr>
                     `;
@@ -724,7 +1250,7 @@
                 // Update statistics
                 document.getElementById('active-cases').textContent = cases.length;
                 document.getElementById('pending-notices').textContent = cases.filter(c => 
-                    calculateDaysRemaining(c.deadlines.sixty_day_notice) > 0
+                    calculateDaysRemaining(c.deadlines?.sixty_day_notice) > 0
                 ).length;
                 
             } catch (error) {
@@ -749,7 +1275,6 @@
                     return;
                 }
                 
-                // Collect all deadlines from all cases
                 const allDeadlines = [];
                 
                 cases.forEach(c => {
@@ -768,10 +1293,8 @@
                     }
                 });
                 
-                // Sort by date
                 allDeadlines.sort((a, b) => new Date(a.date) - new Date(b.date));
                 
-                // Display top 10 upcoming deadlines
                 const upcomingDeadlines = allDeadlines.slice(0, 10);
                 
                 if (upcomingDeadlines.length === 0) {
@@ -798,7 +1321,6 @@
                     `;
                 }).join('');
                 
-                // Update deadline count
                 document.getElementById('upcoming-deadlines').textContent = upcomingDeadlines.length;
                 
             } catch (error) {
@@ -830,7 +1352,6 @@
                     </tr>
                 `).join('');
                 
-                // Update document count for this month
                 const thisMonth = new Date().getMonth();
                 const thisMonthDocs = docs.filter(d => new Date(d.created).getMonth() === thisMonth);
                 document.getElementById('docs-generated').textContent = thisMonthDocs.length;
@@ -868,7 +1389,6 @@
         }
 
         function handleDeadline(caseNumber, deadlineType) {
-            // Handle different deadline types
             if (deadlineType.includes('60-Day')) {
                 generate60DayNotice(caseNumber);
             } else if (deadlineType.includes('Tax')) {
@@ -892,41 +1412,25 @@
             }, 60000);
         });
 
-        // Modal functions with scroll lock fix
+        // Modal functions
         function openNewCaseModal() {
-            const modal = document.getElementById('newCaseModal');
-            
-            // Store current scroll position
             scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
-            
-            // Lock body scroll
             document.body.classList.add('modal-open');
             document.body.style.top = `-${scrollPosition}px`;
-            
-            // Show modal
-            modal.style.display = 'block';
+            document.getElementById('newCaseModal').style.display = 'block';
         }
 
         function closeNewCaseModal() {
-            const modal = document.getElementById('newCaseModal');
-            
-            // Hide modal
-            modal.style.display = 'none';
-            
-            // Unlock body scroll
+            document.getElementById('newCaseModal').style.display = 'none';
             document.body.classList.remove('modal-open');
             document.body.style.top = '';
-            
-            // Restore scroll position
             window.scrollTo(0, scrollPosition);
-            
-            // Reset form
             document.getElementById('quickIntakeForm').reset();
             document.getElementById('success-msg').style.display = 'none';
             document.getElementById('error-msg').style.display = 'none';
         }
 
-        // Form submission - REAL DATA
+        // COMPREHENSIVE Form submission with ALL data
         document.getElementById('quickIntakeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -934,22 +1438,133 @@
             document.getElementById('success-msg').style.display = 'none';
             document.getElementById('error-msg').style.display = 'none';
             
+            // Collect ALL properties
+            const properties = [];
+            for (let i = 1; i <= propertyCount; i++) {
+                if (document.getElementById(`property-address-${i}`)) {
+                    properties.push({
+                        address: document.getElementById(`property-address-${i}`).value,
+                        city: document.getElementById(`property-city-${i}`).value,
+                        state: document.getElementById(`property-state-${i}`).value,
+                        zip: document.getElementById(`property-zip-${i}`).value,
+                        county: document.getElementById(`property-county-${i}`).value,
+                        apn: document.getElementById(`apn-${i}`).value,
+                        type: document.getElementById(`property-type-${i}`).value,
+                        value: document.getElementById(`property-value-${i}`).value,
+                        was_principal_residence: document.getElementById(`was-principal-residence-${i}`)?.checked || false,
+                        family_farm: document.getElementById(`family-farm-${i}`)?.checked || false
+                    });
+                }
+            }
+            
+            // Collect ALL beneficiaries
+            const beneficiaries = [];
+            for (let i = 1; i <= beneficiaryCount; i++) {
+                if (document.getElementById(`beneficiary-name-${i}`)) {
+                    beneficiaries.push({
+                        name: document.getElementById(`beneficiary-name-${i}`).value,
+                        relationship: document.getElementById(`beneficiary-relationship-${i}`).value,
+                        percent: document.getElementById(`beneficiary-percent-${i}`).value,
+                        email: document.getElementById(`beneficiary-email-${i}`).value,
+                        address: document.getElementById(`beneficiary-address-${i}`).value
+                    });
+                }
+            }
+            
+            // COMPREHENSIVE form data including ALL fields needed for documents
             const formData = {
+                // Decedent Information
                 decedent_first_name: document.getElementById('decedent-first').value,
+                decedent_middle_name: document.getElementById('decedent-middle').value,
                 decedent_last_name: document.getElementById('decedent-last').value,
+                decedent_name: `${document.getElementById('decedent-first').value} ${document.getElementById('decedent-middle').value || ''} ${document.getElementById('decedent-last').value}`.trim(),
                 death_date: document.getElementById('death-date').value,
+                death_place: document.getElementById('death-place').value,
                 ssn_last4: document.getElementById('ssn-last4').value,
                 marital_status: document.getElementById('marital-status').value,
-                trustee_name: document.getElementById('trustee-name').value,
-                trustee_phone: document.getElementById('trustee-phone').value,
+                gender: document.getElementById('gender').value,
+                
+                // Trust Information
                 trust_name: document.getElementById('trust-name').value,
+                trust_date: document.getElementById('trust-date').value,
                 trust_type: document.getElementById('trust-type').value,
+                trust_tax_id: document.getElementById('trust-tax-id').value,
                 estate_value: document.getElementById('estate-value').value,
+                has_amendments: document.getElementById('has-amendments').value === 'yes',
+                
+                // Trustee Information
+                trustee_name: document.getElementById('trustee-name').value,
+                trustee_relationship: document.getElementById('trustee-relationship').value,
+                trustee_address: document.getElementById('trustee-address').value,
+                trustee_city: document.getElementById('trustee-city').value,
+                trustee_state: document.getElementById('trustee-state').value,
+                trustee_zip: document.getElementById('trustee-zip').value,
+                trustee_phone: document.getElementById('trustee-phone').value,
+                trustee_email: document.getElementById('trustee-email').value,
+                has_cotrustees: document.getElementById('has-cotrustees').checked,
+                
+                // Properties
+                real_property: properties,
+                primary_property: properties[0] || {},
+                
+                // For BOE forms - use primary property data
+                property_address: properties[0]?.address || '',
+                property_city: properties[0]?.city || '',
+                property_state: properties[0]?.state || 'CA',
+                property_zip: properties[0]?.zip || '',
+                property_county: properties[0]?.county || 'Los Angeles',
+                apn: properties[0]?.apn || '',
+                was_principal_residence: properties[0]?.was_principal_residence || false,
+                family_farm: properties[0]?.family_farm || false,
+                
+                // Beneficiaries
+                beneficiaries: beneficiaries,
+                total_beneficiaries: beneficiaries.length,
+                
+                // BOE Form Specific Data
+                transfer_type: document.getElementById('transfer-type').value,
+                transfer_date: document.getElementById('transfer-date').value || document.getElementById('death-date').value,
+                homeowners_exemption: document.getElementById('homeowners-exemption').checked,
+                disabled_veteran: document.getElementById('disabled-veteran').checked,
+                document_number: document.getElementById('document-number').value,
+                purchase_price: document.getElementById('purchase-price').value || '0',
+                
+                // Map trustee as buyer for BOE forms
+                buyer_name: document.getElementById('trustee-name').value,
+                buyer_address: document.getElementById('trustee-address').value,
+                buyer_city: document.getElementById('trustee-city').value,
+                buyer_state: document.getElementById('trustee-state').value || 'CA',
+                buyer_zip: document.getElementById('trustee-zip').value,
+                buyer_email: document.getElementById('trustee-email').value,
+                buyer_phone: document.getElementById('trustee-phone').value,
+                
+                // Additional fields for BOE forms
+                seller_name: `${document.getElementById('decedent-first').value} ${document.getElementById('decedent-last').value}`,
+                principal_residence: properties[0]?.was_principal_residence || false,
+                transfer_to: document.getElementById('transfer-type').value === 'parent_child' ? 'child' : 
+                            document.getElementById('transfer-type').value === 'spouse' ? 'spouse' : 'trust',
+                
+                // Contact information (for BOE-502-D)
+                contact_name: document.getElementById('trustee-name').value,
+                contact_phone: document.getElementById('trustee-phone').value,
+                contact_email: document.getElementById('trustee-email').value,
+                
+                // Additional Information
+                fee_arrangement: document.getElementById('fee-arrangement').value,
+                urgency_level: document.getElementById('urgency-level').value,
                 initial_notes: document.getElementById('initial-notes').value,
-                generate_initial_docs: true
+                
+                // Documents to Generate
+                generate_initial_docs: true,
+                generate_60day: document.getElementById('gen-60day').checked,
+                generate_gov_notices: document.getElementById('gen-gov-notices').checked,
+                generate_boe_forms: document.getElementById('gen-boe-forms').checked,
+                generate_property_docs: document.getElementById('gen-property-docs').checked,
+                generate_distribution_docs: document.getElementById('gen-distribution-docs').checked
             };
             
             try {
+                // Create the case
                 const response = await fetch('/.netlify/functions/create-trust-case', {
                     method: 'POST',
                     headers: {
@@ -961,30 +1576,91 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Save case to localStorage (temporary storage)
+                    // Save case to localStorage
                     const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
                     cases.push({
                         case_number: result.case_number,
-                        decedent_name: `${formData.decedent_first_name} ${formData.decedent_last_name}`,
+                        decedent_name: formData.decedent_name,
                         death_date: formData.death_date,
                         trustee_name: formData.trustee_name,
                         trust_name: formData.trust_name,
                         deadlines: result.case_data.deadlines,
-                        created: new Date().toISOString()
+                        created: new Date().toISOString(),
+                        // Store all data for later document generation
+                        full_data: formData
                     });
                     localStorage.setItem('trust_cases', JSON.stringify(cases));
                     
-                    document.getElementById('success-msg').textContent = `Case ${result.case_number} created successfully!`;
+                    // Now generate documents if requested
+                    const documentsGenerated = [];
+                    
+                    // Generate BOE Forms
+                    if (formData.generate_boe_forms) {
+                        try {
+                            const boeResponse = await fetch('/.netlify/functions/generate-boe-forms-fixed', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    ...formData,
+                                    case_number: result.case_number,
+                                    generate_pcor: true,
+                                    generate_502d: true,
+                                    generate_19p: formData.transfer_type === 'parent_child'
+                                })
+                            });
+                            
+                            const boeResult = await boeResponse.json();
+                            if (boeResult.success) {
+                                documentsGenerated.push('BOE Forms');
+                                // Download the generated PDFs
+                                if (boeResult.documents) {
+                                    for (const [name, base64] of Object.entries(boeResult.documents)) {
+                                        downloadPDF(base64, `${result.case_number}_${name}.pdf`);
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            console.error('BOE generation error:', err);
+                        }
+                    }
+                    
+                    // Generate Government Notices
+                    if (formData.generate_gov_notices) {
+                        try {
+                            const govResponse = await fetch('/.netlify/functions/generate-government-notices', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    ...formData,
+                                    case_number: result.case_number,
+                                    agencies: ['ftb', 'irs', 'dhcs', 'ssa']
+                                })
+                            });
+                            
+                            const govResult = await govResponse.json();
+                            if (govResult.success) {
+                                documentsGenerated.push('Government Notices');
+                            }
+                        } catch (err) {
+                            console.error('Government notices error:', err);
+                        }
+                    }
+                    
+                    document.getElementById('success-msg').innerHTML = `
+                        ✅ Case ${result.case_number} created successfully!<br>
+                        📄 Documents generated: ${documentsGenerated.join(', ') || 'None'}<br>
+                        ⏰ 60-day notice deadline: ${result.case_data.deadlines.sixty_day_notice}
+                    `;
                     document.getElementById('success-msg').style.display = 'block';
                     
                     // Reload data
                     loadCases();
                     loadDeadlines();
                     
-                    // Close modal after 3 seconds
+                    // Close modal after 5 seconds
                     setTimeout(() => {
                         closeNewCaseModal();
-                    }, 3000);
+                    }, 5000);
                 } else {
                     throw new Error(result.error || 'Failed to create case');
                 }
@@ -996,76 +1672,96 @@
             }
         });
 
-        // Generate various documents
-        async function generateGovernmentNotices() {
+        // Download PDF helper
+        function downloadPDF(base64Data, filename) {
+            const link = document.createElement('a');
+            link.href = 'data:application/pdf;base64,' + base64Data;
+            link.download = filename;
+            link.click();
+        }
+
+        // Generate BOE Forms for existing case
+        async function generateBOEForms() {
             const caseNumber = prompt('Enter Case Number (e.g., TA-2024-001):');
             if (!caseNumber) return;
             
+            // Get case data from localStorage
+            const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+            const caseData = cases.find(c => c.case_number === caseNumber);
+            
+            if (!caseData || !caseData.full_data) {
+                alert('Case not found or missing data. Please create a new case with complete information.');
+                return;
+            }
+            
             try {
-                const response = await fetch('/.netlify/functions/generate-government-notices', {
+                const response = await fetch('/.netlify/functions/generate-boe-forms-fixed', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ case_number: caseNumber })
+                    body: JSON.stringify({
+                        ...caseData.full_data,
+                        case_number: caseNumber,
+                        generate_pcor: true,
+                        generate_502d: true,
+                        generate_19p: true
+                    })
                 });
                 
                 const result = await response.json();
-                if (result.success) {
-                    alert('Government notices generated successfully!');
-                    downloadDocuments(result.documents, caseNumber);
+                if (result.success && result.documents) {
+                    alert('BOE forms generated successfully!');
+                    for (const [name, base64] of Object.entries(result.documents)) {
+                        downloadPDF(base64, `${caseNumber}_${name}.pdf`);
+                    }
+                } else {
+                    alert('Error generating BOE forms: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
-                alert('Error generating notices: ' + error.message);
+                alert('Error generating BOE forms: ' + error.message);
             }
         }
 
-        function generateABTrustDocs() {
-            const caseNumber = prompt('Enter Case Number for A/B Trust Split:');
-            if (!caseNumber) return;
-            
-            // This would call the A/B trust document generation function
-            alert('A/B Trust split documents will be generated for case ' + caseNumber);
+        // Other document generation functions
+        function generateGovernmentNotices() {
+            const caseNumber = prompt('Enter Case Number for Government Notices:');
+            if (caseNumber) {
+                alert('Government notices will be generated for case ' + caseNumber);
+            }
         }
 
         function generatePropertyDocs() {
             const caseNumber = prompt('Enter Case Number for Property Documents:');
-            if (!caseNumber) return;
-            
-            // This would call the property document generation function
-            alert('Property documents will be generated for case ' + caseNumber);
+            if (caseNumber) {
+                alert('Property documents will be generated for case ' + caseNumber);
+            }
         }
 
         function generateAccountingReport() {
             const caseNumber = prompt('Enter Case Number for Trust Accounting:');
-            if (!caseNumber) return;
-            
-            // This would call the accounting report generation function
-            alert('Trust accounting report will be generated for case ' + caseNumber);
+            if (caseNumber) {
+                alert('Trust accounting report will be generated for case ' + caseNumber);
+            }
         }
 
-        // Download generated documents
-        function downloadDocuments(documents, caseNumber) {
-            Object.entries(documents).forEach(([name, base64]) => {
-                const link = document.createElement('a');
-                link.href = 'data:application/pdf;base64,' + base64;
-                link.download = `${caseNumber}_${name}.pdf`;
-                link.click();
-            });
+        function generateNotices() {
+            const caseNumber = prompt('Enter Case Number for 60-Day Notices:');
+            if (caseNumber) {
+                alert('60-Day notices will be generated for case ' + caseNumber);
+            }
         }
 
-        // View case details
         function viewCase(caseNumber) {
             window.location.href = `/case-details.html?case=${caseNumber}`;
         }
 
-        // Generate documents for existing case
-        function generateDocs(caseNumber) {
-            const docType = prompt('Which documents to generate?\n1. 60-Day Notice\n2. Government Notices\n3. Property Docs\n4. All Documents');
+        function generateDocsForCase(caseNumber) {
+            const docType = prompt('Which documents to generate?\n1. BOE Forms\n2. Government Notices\n3. Property Docs\n4. All Documents');
             
             switch(docType) {
                 case '1':
-                    generateNotices();
+                    generateBOEForms();
                     break;
                 case '2':
                     generateGovernmentNotices();
@@ -1077,29 +1773,6 @@
                     alert('Generating all documents for case ' + caseNumber);
                     break;
             }
-        }
-
-        // Generate specific notice
-        function generateNotice(caseName) {
-            alert(`Generating 60-day notice for ${caseName} trust`);
-        }
-
-        // Prepare tax documents
-        function prepareTaxDocs(caseName) {
-            alert(`Preparing tax documents for ${caseName} estate`);
-        }
-
-        // Generate notices
-        function generateNotices() {
-            const caseNumber = prompt('Enter Case Number for 60-Day Notices:');
-            if (!caseNumber) return;
-            
-            alert('60-Day notices will be generated for case ' + caseNumber);
-        }
-
-        // Generate 60-day notice
-        function generate60DayNotice(caseNumber) {
-            alert(`Generating 60-day notice for case ${caseNumber}`);
         }
 
         // Close modal when clicking outside
