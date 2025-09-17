@@ -1,5 +1,5 @@
 // netlify/functions/generate-boe-forms.js
-// COMPLETE VERSION - Fixed with correct URL
+// COMPLETE VERSION - Fixed with correct URL path including /public/
 
 const { PDFDocument } = require('pdf-lib');
 
@@ -14,9 +14,9 @@ function formatDate(dateString) {
 async function loadPDFFromDeployedSite(filename) {
   const fetch = (await import('node-fetch')).default;
   
-  // CORRECTED URL - using trustadministration (without automation)
+  // CORRECTED URL - using /public/templates/ path
   const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministration.netlify.app';
-  const url = `${siteUrl}/templates/${filename}`;
+  const url = `${siteUrl}/public/templates/${filename}`;
   
   try {
     console.log(`Loading ${filename} from: ${url}`);
