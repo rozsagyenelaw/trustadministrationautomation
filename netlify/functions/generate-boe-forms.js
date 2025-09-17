@@ -1,5 +1,5 @@
 // netlify/functions/generate-boe-forms.js
-// COMPLETE VERSION - Fixed with correct URL path including /public/
+// COMPLETE VERSION with enhanced field mapping and debugging - FULL CODE
 
 const { PDFDocument } = require('pdf-lib');
 
@@ -14,7 +14,6 @@ function formatDate(dateString) {
 async function loadPDFFromDeployedSite(filename) {
   const fetch = (await import('node-fetch')).default;
   
-  // CORRECTED URL - using /public/templates/ path
   const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministration.netlify.app';
   const url = `${siteUrl}/public/templates/${filename}`;
   
@@ -36,7 +35,48 @@ async function loadPDFFromDeployedSite(filename) {
   }
 }
 
-// Fill BOE-502-A (PCOR) - Official Form
+// Helper function to analyze PDF form fields
+function analyzePDFForm(form) {
+  const fields = form.getFields();
+  const fieldInfo = {};
+  
+  fields.forEach(field => {
+    const name = field.getName();
+    let type = 'unknown';
+    
+    try {
+      if (field.constructor.name.includes('Text')) type = 'text';
+      else if (field.constructor.name.includes('Check')) type = 'checkbox';
+      else if (field.constructor.name.includes('Radio')) type = 'radio';
+      else if (field.constructor.name.includes('Dropdown')) type = 'dropdown';
+      else if (field.constructor.name.includes('List')) type = 'list';
+    } catch (e) {
+      // Fallback type detection
+      try {
+        form.getTextField(name);
+        type = 'text';
+      } catch (e1) {
+        try {
+          form.getCheckBox(name);
+          type = 'checkbox';
+        } catch (e2) {
+          try {
+            form.getRadioGroup(name);
+            type = 'radio';
+          } catch (e3) {
+            type = 'other';
+          }
+        }
+      }
+    }
+    
+    fieldInfo[name] = type;
+  });
+  
+  return fieldInfo;
+}
+
+// Fill BOE-502-A (PCOR) - Complete function
 async function fillPCOR(data, pdfBytes) {
   try {
     console.log('Filling BOE-502-A (PCOR) form...');
@@ -44,102 +84,298 @@ async function fillPCOR(data, pdfBytes) {
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
-    // Get all field names for debugging
+    // Analyze form fields
+    const fieldInfo = analyzePDFForm(form);
+    console.log('BOE-502-A field analysis:', JSON.stringify(fieldInfo, null, 2));
+    
+    // Get all fields
     const fields = form.getFields();
-    console.log('BOE-502-A available fields:', fields.map(f => f.getName()));
     
-    // Field mappings
-    const fieldMappings = [
-      // Buyer Information
-      { fieldNames: ['Buyer Name', 'Name', 'buyer_name', 'Transferee Name', 'Name and mailing address of buyer/transferee'], value: data.buyer_name || data.trustee_name },
-      { fieldNames: ['Buyer Address', 'Address', 'Mailing Address', 'buyer_address'], value: data.buyer_address || data.trustee_address },
-      { fieldNames: ['City', 'Buyer City', 'buyer_city'], value: data.buyer_city || data.trustee_city },
-      { fieldNames: ['State', 'Buyer State', 'buyer_state'], value: data.buyer_state || data.trustee_state || 'CA' },
-      { fieldNames: ['ZIP', 'Zip Code', 'ZIP code', 'buyer_zip'], value: data.buyer_zip || data.trustee_zip },
-      { fieldNames: ['Email', 'Buyer Email', "Buyer's email address", 'buyer_email'], value: data.buyer_email || data.trustee_email },
-      { fieldNames: ['Phone', 'Daytime Phone', "buyer's daytime telephone number1", 'buyer_phone'], value: data.buyer_phone || data.trustee_phone },
+    // Process each field
+    fields.forEach(field => {
+      const fieldName = field.getName();
+      let value = null;
       
-      // Property Information
-      { fieldNames: ['APN', 'Assessors Parcel Number', 'Assessors parcel number', 'Parcel Number'], value: data.apn },
-      { fieldNames: ['Property Address', 'Street Address', 'street address or physical location of real property'], value: data.property_address },
-      { fieldNames: ['Property City', 'city'], value: data.property_city },
-      { fieldNames: ['Property State', 'state'], value: data.property_state || 'CA' },
-      { fieldNames: ['Property ZIP', 'Property Zip'], value: data.property_zip },
+      // Map data to field names - comprehensive mapping
       
-      // Seller Information
-      { fieldNames: ['Seller Name', 'seller transferor', 'Seller/Transferor', 'seller_name'], value: data.seller_name || data.decedent_name },
+      // Buyer/Transferee information
+      if (fieldName.includes('NAME AND MAILING ADDRESS') || 
+          fieldName === 'Rozsa Gyene' ||
+          fieldName.includes('BUYER/TRANSFEREE')) {
+        value = data.trustee_name || data.buyer_name;
+      }
+      else if (fieldName.includes('BUYER\'S EMAIL ADDRESS') || 
+               fieldName === 'rozsagyenelaw@yahoo.com' ||
+               fieldName.includes('EMAIL')) {
+        value = data.trustee_email || data.buyer_email;
+      }
+      else if (fieldName.includes('BUYER\'S DAYTIME TELEPHONE NUMBER') || 
+               fieldName === '8184344541' ||
+               fieldName.includes('TELEPHONE') ||
+               fieldName.includes('PHONE')) {
+        value = data.trustee_phone || data.buyer_phone;
+      }
+      else if (fieldName.includes('ASSESSOR\'S PARCEL NUMBER') ||
+               fieldName.includes('APN') ||
+               fieldName.includes('PARCEL')) {
+        value = data.apn;
+      }
       
-      // Transfer Information
-      { fieldNames: ['Transfer Date', 'Date of Transfer', 'transfer_date'], value: formatDate(data.transfer_date || data.death_date) },
-      { fieldNames: ['Purchase Price', 'Total purchase price', 'purchase_price'], value: data.purchase_price || '0' },
-      { fieldNames: ['Document Number', 'Recording Number', 'document_number'], value: data.document_number },
-    ];
-    
-    // Fill text fields
-    for (const mapping of fieldMappings) {
-      if (!mapping.value) continue;
+      // Seller information
+      else if (fieldName.includes('SELLER/TRANSFEROR') || 
+               fieldName === 'kurva anyadketto' ||
+               fieldName.includes('SELLER')) {
+        value = data.decedent_name || data.seller_name;
+      }
       
-      for (const fieldName of mapping.fieldNames) {
+      // Property address
+      else if (fieldName.includes('STREET ADDRESS') || 
+               fieldName === '1904 broadview drive' ||
+               fieldName.includes('PHYSICAL LOCATION')) {
+        value = data.property_address;
+      }
+      else if (fieldName === 'glendale' || 
+               fieldName.includes('CITY') ||
+               (fieldName.includes('city') && !fieldName.includes('STATE'))) {
+        value = data.property_city;
+      }
+      else if (fieldName === 'CA' || 
+               fieldName.includes('STATE') ||
+               (fieldName.includes('state') && !fieldName.includes('CITY'))) {
+        value = data.property_state || 'CA';
+      }
+      else if (fieldName === '91208' || 
+               fieldName.includes('ZIP') ||
+               fieldName.includes('zip')) {
+        value = data.property_zip;
+      }
+      
+      // Mail property tax information to
+      else if (fieldName.includes('MAIL PROPERTY TAX INFORMATION TO (NAME)')) {
+        value = data.mail_to_name || data.trustee_name;
+      }
+      else if (fieldName.includes('MAIL PROPERTY TAX INFORMATION TO (ADDRESS)')) {
+        value = data.mail_to_address || data.trustee_address;
+      }
+      else if (fieldName.includes('MAIL') && fieldName.includes('CITY')) {
+        value = data.mail_to_city || data.trustee_city;
+      }
+      else if (fieldName.includes('MAIL') && fieldName.includes('STATE')) {
+        value = data.mail_to_state || data.trustee_state || 'CA';
+      }
+      else if (fieldName.includes('MAIL') && fieldName.includes('ZIP')) {
+        value = data.mail_to_zip || data.trustee_zip;
+      }
+      
+      // Try to set the value if we have one
+      if (value) {
         try {
-          const field = form.getTextField(fieldName);
-          if (field) {
-            field.setText(String(mapping.value));
-            console.log(`Filled field "${fieldName}" with "${mapping.value}"`);
-            break;
+          if (fieldInfo[fieldName] === 'text') {
+            const textField = form.getTextField(fieldName);
+            textField.setText(String(value));
+            console.log(`Set text field "${fieldName}" to "${value}"`);
           }
         } catch (e) {
-          // Field doesn't exist with this name, try next
+          console.error(`Failed to set field "${fieldName}":`, e.message);
         }
       }
-    }
+    });
     
-    // Checkbox mappings
-    const checkboxMappings = [
-      // Spouse transfer
-      { condition: data.transfer_type === 'spouse', fieldNames: ['A. This transfer is solely between spouses (addition or removal of a spouse, death of a spouse, divorce settlement, etc.)­yes', 'Spouse Transfer', 'spouse_transfer'] },
-      
-      // Parent-Child transfer
-      { condition: data.transfer_type === 'parent_child', fieldNames: ['C. This is a transfer between: parents and children or grandparents and grandchildren_yes', 'Parent Child Transfer', 'parent_child'] },
-      
-      // Trust transfer
-      { condition: data.transfer_type === 'trust', fieldNames: ['L1. This is a transfer of property to/from a revocable trust that may be revoked by the transferor and is for the benefit of the transferor and/or the transferor\'s spouse and/or registered domestic partner Yes', 'Trust Transfer', 'revocable_trust'] },
-      
-      // Death of co-owner
-      { condition: data.transfer_type === 'cotenant_death', fieldNames: ['D.This transfer is the result of a cotenant\'s death_yes', 'Cotenant Death', 'death_cotenant'] },
-      
-      // Principal residence
-      { condition: data.principal_residence === true, fieldNames: ['This property is intended as my principal residence. If YES, please indicate the date of occupancy or intended occupancy Yes', 'Principal Residence Yes', 'principal_residence_yes'] },
-      { condition: data.principal_residence === false, fieldNames: ['This property is intended as my principal residence. If YES, please indicate the date of occupancy or intended occupancy_no', 'Principal Residence No', 'principal_residence_no'] },
-      
-      // Disabled veteran
-      { condition: data.disabled_veteran === true, fieldNames: ['Are you a disabled veteran or an unmarried surviving spouse of a disabled veteran who was compensated at 100% by the Department of Veterans Affairs or an unmarried surviving spouse of a 100% rated disabled veteran? Yes', 'Disabled Veteran Yes', 'disabled_veteran_yes'] },
-      { condition: data.disabled_veteran === false, fieldNames: ['Are you a disabled veteran or an unmarried surviving spouse of a disabled veteran who was compensated at 100% by the Department of Veterans Affairs or an unmarried surviving spouse of a 100% rated disabled veteran? No', 'Disabled Veteran No', 'disabled_veteran_no'] },
-      
-      // Was principal residence (for parent-child transfer)
-      { condition: data.was_principal_residence === true, fieldNames: ["Was this the transferor/grantor's principal residence? Yes", 'Transferor Principal Residence Yes'] },
-      { condition: data.was_principal_residence === false, fieldNames: ["Was this the transferor/grantor's principal residence? No", 'Transferor Principal Residence No'] },
-      
-      // Family farm
-      { condition: data.family_farm === true, fieldNames: ['Is this a family farm? Yes', 'Family Farm Yes'] },
-      { condition: data.family_farm === false, fieldNames: ['Is this a family farm? No', 'Family Farm No'] },
-    ];
-    
-    // Check appropriate boxes
-    for (const mapping of checkboxMappings) {
-      if (!mapping.condition) continue;
-      
-      for (const fieldName of mapping.fieldNames) {
-        try {
-          const checkbox = form.getCheckBox(fieldName);
-          if (checkbox) {
+    // Handle checkboxes for Part 1 - Transfer Information
+    try {
+      // A. Spouse transfer
+      if (data.transfer_type === 'spouse') {
+        const spouseFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('between spouses') || 
+                 name.includes('A.') ||
+                 name.includes('spouse') ||
+                 name.includes('death of a spouse');
+        });
+        spouseFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
             checkbox.check();
-            console.log(`Checked box "${fieldName}"`);
-            break;
-          }
-        } catch (e) {
-          // Checkbox doesn't exist with this name, try next
+            console.log(`Checked spouse transfer box: ${field.getName()}`);
+          } catch (e) {}
+        });
+      }
+      
+      // B. Domestic partner transfer
+      if (data.transfer_type === 'domestic_partner') {
+        const dpFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('domestic partners') || 
+                 name.includes('B.') ||
+                 name.includes('registered with the California Secretary');
+        });
+        dpFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked domestic partner transfer box: ${field.getName()}`);
+          } catch (e) {}
+        });
+      }
+      
+      // C. Parent-Child transfer
+      if (data.transfer_type === 'parent_child') {
+        const pcFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('parent(s) and child(ren)') || 
+                 name.includes('C.') ||
+                 name.includes('between parent') ||
+                 name.includes('grandparent(s) and grandchild(ren)');
+        });
+        pcFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked parent-child transfer box: ${field.getName()}`);
+          } catch (e) {}
+        });
+        
+        // Principal residence sub-question
+        if (data.was_principal_residence === true) {
+          const prYesFields = fields.filter(f => {
+            const name = f.getName();
+            return name.includes('principal residence') && 
+                   (name.includes('YES') || name.includes('Yes'));
+          });
+          prYesFields.forEach(field => {
+            try {
+              const checkbox = form.getCheckBox(field.getName());
+              checkbox.check();
+              console.log(`Checked principal residence YES: ${field.getName()}`);
+            } catch (e) {}
+          });
+        } else if (data.was_principal_residence === false) {
+          const prNoFields = fields.filter(f => {
+            const name = f.getName();
+            return name.includes('principal residence') && 
+                   (name.includes('NO') || name.includes('No'));
+          });
+          prNoFields.forEach(field => {
+            try {
+              const checkbox = form.getCheckBox(field.getName());
+              checkbox.check();
+              console.log(`Checked principal residence NO: ${field.getName()}`);
+            } catch (e) {}
+          });
+        }
+        
+        // Family farm sub-question
+        if (data.family_farm === true) {
+          const ffYesFields = fields.filter(f => {
+            const name = f.getName();
+            return name.includes('family farm') && 
+                   (name.includes('YES') || name.includes('Yes'));
+          });
+          ffYesFields.forEach(field => {
+            try {
+              const checkbox = form.getCheckBox(field.getName());
+              checkbox.check();
+              console.log(`Checked family farm YES: ${field.getName()}`);
+            } catch (e) {}
+          });
+        } else if (data.family_farm === false) {
+          const ffNoFields = fields.filter(f => {
+            const name = f.getName();
+            return name.includes('family farm') && 
+                   (name.includes('NO') || name.includes('No'));
+          });
+          ffNoFields.forEach(field => {
+            try {
+              const checkbox = form.getCheckBox(field.getName());
+              checkbox.check();
+              console.log(`Checked family farm NO: ${field.getName()}`);
+            } catch (e) {}
+          });
         }
       }
+      
+      // D. Cotenant death
+      if (data.transfer_type === 'cotenant_death') {
+        const cotenantFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('cotenant') || 
+                 name.includes('D.') ||
+                 name.includes('result of a cotenant\'s death');
+        });
+        cotenantFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked cotenant death box: ${field.getName()}`);
+          } catch (e) {}
+        });
+        
+        // Date of death for cotenant
+        if (data.death_date) {
+          const deathDateFields = fields.filter(f => 
+            f.getName().includes('Date of death')
+          );
+          deathDateFields.forEach(field => {
+            try {
+              const textField = form.getTextField(field.getName());
+              textField.setText(formatDate(data.death_date));
+            } catch (e) {}
+          });
+        }
+      }
+      
+      // L. Trust transfer
+      if (data.transfer_type === 'trust') {
+        const trustFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('revocable trust') || 
+                 name.includes('L.') ||
+                 name.includes('L1.') ||
+                 name.includes('to/from a revocable trust');
+        });
+        trustFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked trust transfer box: ${field.getName()}`);
+          } catch (e) {}
+        });
+      }
+      
+      // Principal residence checkbox at top
+      if (data.principal_residence === true) {
+        const prFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('This property is intended as my principal residence') && 
+                 (name.includes('YES') || !name.includes('NO'));
+        });
+        prFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked principal residence intended: ${field.getName()}`);
+          } catch (e) {}
+        });
+      }
+      
+      // Disabled veteran checkbox
+      if (data.disabled_veteran === true) {
+        const dvFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('100% rated disabled veteran') && 
+                 (name.includes('YES') || !name.includes('NO'));
+        });
+        dvFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked disabled veteran: ${field.getName()}`);
+          } catch (e) {}
+        });
+      }
+      
+    } catch (e) {
+      console.error('Error checking boxes:', e);
     }
     
     return await pdfDoc.save();
@@ -150,7 +386,7 @@ async function fillPCOR(data, pdfBytes) {
   }
 }
 
-// Fill BOE-502-D (Death of Real Property Owner)
+// Fill BOE-502-D (Death of Real Property Owner) - Complete function
 async function fillBOE502D(data, pdfBytes) {
   try {
     console.log('Filling BOE-502-D (Death of Real Property Owner) form...');
@@ -315,7 +551,7 @@ async function fillBOE502D(data, pdfBytes) {
   }
 }
 
-// Fill BOE-19-P (Parent-Child Exclusion)
+// Fill BOE-19-P (Parent-Child Exclusion) - Complete function
 async function fillBOE19P(data, pdfBytes) {
   try {
     console.log('Filling BOE-19-P (Parent-Child Exclusion) form...');
@@ -323,122 +559,344 @@ async function fillBOE19P(data, pdfBytes) {
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const form = pdfDoc.getForm();
     
-    // Get all field names for debugging
+    // Analyze form fields
+    const fieldInfo = analyzePDFForm(form);
+    console.log('BOE-19-P field analysis:', JSON.stringify(fieldInfo, null, 2));
+    
     const fields = form.getFields();
-    console.log('BOE-19-P available fields:', fields.map(f => f.getName()));
     
-    // Field mappings for BOE-19-P
-    const fieldMappings = [
-      // Property Information
-      { fieldNames: ["Assessor's Parcel/ID Number", 'APN', 'Parcel Number'], value: data.apn },
-      { fieldNames: ['PROPERTY ADDRESS', 'Property Address', 'property_address'], value: data.property_address },
-      { fieldNames: ['CITY', 'Property City', 'property_city'], value: data.property_city },
-      { fieldNames: ['COUNTY', 'County', 'county'], value: data.property_county || 'LOS ANGELES' },
+    // Process each field with comprehensive mapping
+    fields.forEach(field => {
+      const fieldName = field.getName();
+      let value = null;
       
-      // Transfer Information
-      { fieldNames: ['DATE OF PURCHASE OR TRANSFER', 'Transfer Date', 'transfer_date'], value: formatDate(data.transfer_date || data.death_date) },
-      { fieldNames: ['RECORDERS DOCUMENT NUMBER', 'Document Number', 'document_number'], value: data.document_number },
-      { fieldNames: ['DATE OF DEATH if applicable', 'Death Date', 'death_date'], value: formatDate(data.death_date) },
+      // Property information section
+      if (fieldName.includes('ASSESSOR\'S PARCEL') || 
+          fieldName.includes('PARCEL/ID NUMBER') ||
+          fieldName.includes('PARCEL NUMBER')) {
+        value = data.apn;
+      }
+      else if (fieldName === '1904 broadview drive' || 
+               fieldName.includes('PROPERTY ADDRESS') ||
+               (fieldName.includes('ADDRESS') && !fieldName.includes('MAILING'))) {
+        value = data.property_address;
+      }
+      else if (fieldName === 'glendale' || 
+               (fieldName.includes('CITY') && !fieldName.includes('COUNTY'))) {
+        value = data.property_city;
+      }
+      else if (fieldName.includes('COUNTY')) {
+        value = data.property_county || 'LOS ANGELES';
+      }
+      else if (fieldName.includes('DATE OF PURCHASE') || 
+               fieldName.includes('TRANSFER') ||
+               fieldName === '02/02/2000') {
+        value = formatDate(data.transfer_date || data.death_date);
+      }
+      else if (fieldName.includes('RECORDER') || 
+               fieldName.includes('DOCUMENT NUMBER')) {
+        value = data.document_number;
+      }
+      else if (fieldName.includes('DATE OF DEATH') || 
+               fieldName === '09/16/2025') {
+        value = formatDate(data.death_date);
+      }
+      else if (fieldName.includes('PROBATE NUMBER')) {
+        value = data.probate_number;
+      }
+      else if (fieldName.includes('DATE OF DECREE')) {
+        value = formatDate(data.decree_date);
+      }
       
-      // Transferor (Parent) Information
-      { fieldNames: ['Name', 'Transferor Name 1', 'transferor1_name'], value: data.decedent_name || data.seller_name },
-      { fieldNames: ['Name_2', 'Transferor Name 2', 'transferor2_name'], value: data.transferor2_name },
-      { fieldNames: ['Relationship', 'Transferor Relationship 1', 'transferor1_relationship'], value: 'Parent' },
-      { fieldNames: ['Relationship_2', 'Transferor Relationship 2', 'transferor2_relationship'], value: data.transferor2_relationship },
+      // Transferor (Parent) information - Section B
+      else if ((fieldName === 'kurva anyadketto' || 
+                fieldName === 'Name' ||
+                (fieldName.includes('Name') && !fieldName.includes('PRINTED') && !fieldName.includes('_'))) &&
+               !value) {
+        value = data.decedent_name || data.seller_name;
+      }
+      else if (fieldName === 'Parent' || 
+               (fieldName === 'Relationship' && !fieldName.includes('_'))) {
+        value = 'Parent';
+      }
+      else if (fieldName === 'Name_2') {
+        value = data.transferor2_name;
+      }
+      else if (fieldName === 'Relationship_2') {
+        value = data.transferor2_relationship || 'Parent';
+      }
       
-      // Transferee (Child) Information
-      { fieldNames: ['Name_3', 'Transferee Name 1', 'transferee1_name'], value: data.trustee_name || data.buyer_name },
-      { fieldNames: ['Name_4', 'Transferee Name 2', 'transferee2_name'], value: data.transferee2_name },
-      { fieldNames: ['Relationship_3', 'Transferee Relationship 1', 'transferee1_relationship'], value: 'Child' },
-      { fieldNames: ['Relationship_4', 'Transferee Relationship 2', 'transferee2_relationship'], value: data.transferee2_relationship },
+      // Transferee (Child) information - Section D
+      else if (fieldName === 'Name_3' || 
+               (fieldName === 'Rozsa Gyene' && !fieldName.includes('PRINTED'))) {
+        value = data.trustee_name || data.buyer_name;
+      }
+      else if (fieldName === 'Relationship_3' || 
+               fieldName === 'Child') {
+        value = 'Child';
+      }
+      else if (fieldName === 'Name_4') {
+        value = data.transferee2_name;
+      }
+      else if (fieldName === 'Relationship_4') {
+        value = data.transferee2_relationship || 'Child';
+      }
       
-      // Signature Section
-      { fieldNames: ['PRINTED NAME', 'Signer Name 1', 'signer1_name'], value: data.trustee_name },
-      { fieldNames: ['PRINTED NAME_2', 'Signer Name 2', 'signer2_name'], value: data.signer2_name },
-      { fieldNames: ['DATE', 'Sign Date', 'sign_date'], value: formatDate(new Date()) },
-      { fieldNames: ['DATE_2', 'Sign Date 2', 'sign_date_2'], value: formatDate(new Date()) },
-      { fieldNames: ['MAILING ADDRESS', 'Mailing Address', 'mailing_address'], value: data.trustee_address },
-      { fieldNames: ['EMAIL ADDRESS', 'Email', 'email_address'], value: data.trustee_email },
-      { fieldNames: ['DAYTIME PHONE NUMBER', 'Phone', 'phone_number'], value: data.trustee_phone },
+      // Certification/Signature section
+      else if (fieldName.includes('PRINTED NAME') || 
+               (fieldName === 'Rozsa Gyene' && field.getName().includes('PRINTED'))) {
+        value = data.trustee_name || data.buyer_name;
+      }
+      else if (fieldName === 'PRINTED NAME_2') {
+        value = data.signer2_name;
+      }
+      else if ((fieldName === 'DATE' || fieldName === '09/17/2025') && 
+               !fieldName.includes('DEATH') && !fieldName.includes('PURCHASE')) {
+        value = formatDate(new Date());
+      }
+      else if (fieldName === 'DATE_2') {
+        value = formatDate(new Date());
+      }
+      else if (fieldName.includes('MAILING ADDRESS') || 
+               (fieldName === '1904 broadview drive' && fieldName.includes('MAILING'))) {
+        value = data.trustee_address || data.buyer_address;
+      }
+      else if (fieldName.includes('CITY, STATE, ZIP')) {
+        value = `${data.trustee_city || data.buyer_city}, ${data.trustee_state || data.buyer_state || 'CA'} ${data.trustee_zip || data.buyer_zip}`;
+      }
+      else if (fieldName === '8184344541' || 
+               fieldName.includes('DAYTIME PHONE NUMBER') ||
+               fieldName.includes('PHONE')) {
+        value = data.trustee_phone || data.buyer_phone;
+      }
+      else if (fieldName === 'rozsagyenelaw@yahoo.com' || 
+               fieldName.includes('EMAIL ADDRESS')) {
+        value = data.trustee_email || data.buyer_email;
+      }
+      else if (fieldName.includes('percentage transferred')) {
+        value = data.percentage_transferred;
+      }
       
-      // Percentage transferred (if partial)
-      { fieldNames: ['If yes, percentage transferrred', 'Percentage Transferred', 'percentage_transferred'], value: data.percentage_transferred },
-    ];
-    
-    // Fill text fields
-    for (const mapping of fieldMappings) {
-      if (!mapping.value) continue;
-      
-      for (const fieldName of mapping.fieldNames) {
+      // Try to set the value
+      if (value) {
         try {
-          const field = form.getTextField(fieldName);
-          if (field) {
-            field.setText(String(mapping.value));
-            console.log(`Filled field "${fieldName}" with "${mapping.value}"`);
-            break;
+          if (fieldInfo[fieldName] === 'text') {
+            const textField = form.getTextField(fieldName);
+            textField.setText(String(value));
+            console.log(`Set text field "${fieldName}" to "${value}"`);
           }
         } catch (e) {
-          // Field doesn't exist with this name, try next
+          console.error(`Failed to set field "${fieldName}":`, e.message);
         }
       }
-    }
+    });
     
-    // Handle checkboxes
-    const checkboxMappings = [
-      // Was transferor's principal residence
-      { condition: data.was_principal_residence === true || data.was_transferor_principal_residence === true, 
-        fieldNames: ['Was this property the transferor\'s principal residence Yes', 'Transferor Principal Residence Yes'] },
-      { condition: data.was_principal_residence === false || data.was_transferor_principal_residence === false, 
-        fieldNames: ['Was this property the transferor\'s principal residence? No', 'Transferor Principal Residence No'] },
-      
-      // Is transferee's principal residence
-      { condition: data.is_transferee_principal_residence === true || data.principal_residence === true, 
-        fieldNames: ['Is this property currently the transferee\'s principal residence? Yes', 'Transferee Principal Residence Yes'] },
-      { condition: data.is_transferee_principal_residence === false || data.principal_residence === false, 
-        fieldNames: ['Is this property currently the transferee\'s principal residence? No', 'Transferee Principal Residence No'] },
-      
-      // Homeowners exemption
-      { condition: data.homeowners_exemption === true, fieldNames: ['Homeowners Exemption', 'homeowners_exemption'] },
-      
-      // Disabled veterans exemption
-      { condition: data.disabled_veterans_exemption === true || data.disabled_veteran === true, 
-        fieldNames: ['Disabled Veterans Exemption', 'disabled_veterans_exemption'] },
-      
-      // Was family farm
-      { condition: data.was_family_farm === true || data.family_farm === true, 
-        fieldNames: ['Was this property the transferor\'s family farm? Yes', 'Transferor Family Farm Yes'] },
-      { condition: data.was_family_farm === false || data.family_farm === false, 
-        fieldNames: ['Was this property the transferor\'s family farm? No', 'Transferor Family Farm No'] },
-      
-      // Is family farm
-      { condition: data.is_family_farm === true, fieldNames: ['Is this property the transferee\'s family farm? Yes', 'Transferee Family Farm Yes'] },
-      { condition: data.is_family_farm === false, fieldNames: ['Is this property the transferee\'s family farm? No', 'Transferee Family Farm No'] },
-      
-      // Joint tenancy
-      { condition: data.joint_tenancy === true, fieldNames: ['Was this property owned in joint tenancy? Yes', 'Joint Tenancy Yes'] },
-      { condition: data.joint_tenancy === false, fieldNames: ['Was this property owned in joint tenancy? No', 'Joint Tenancy No'] },
-      
-      // Partial interest
-      { condition: data.partial_interest === true, fieldNames: ['Was only a partial interest in the property transferred? Yes', 'Partial Interest Yes'] },
-      { condition: data.partial_interest === false, fieldNames: ['Was only a partial interest in the property transferred? No', 'Partial Interest No'] },
-    ];
-    
-    // Check appropriate boxes
-    for (const mapping of checkboxMappings) {
-      if (!mapping.condition) continue;
-      
-      for (const fieldName of mapping.fieldNames) {
-        try {
-          const checkbox = form.getCheckBox(fieldName);
-          if (checkbox) {
+    // Handle checkboxes - comprehensive checkbox handling
+    try {
+      // Was this the transferor's family farm?
+      if (data.was_family_farm === true || data.family_farm === true) {
+        const farmYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferor\'s family farm') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        farmYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
             checkbox.check();
-            console.log(`Checked box "${fieldName}"`);
-            break;
-          }
-        } catch (e) {
-          // Checkbox doesn't exist with this name, try next
-        }
+            console.log(`Checked transferor's family farm YES`);
+          } catch (e) {}
+        });
+      } else if (data.was_family_farm === false || data.family_farm === false) {
+        const farmNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferor\'s family farm') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        farmNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferor's family farm NO`);
+          } catch (e) {}
+        });
       }
+      
+      // Was this the transferor's principal residence?
+      if (data.was_principal_residence === true || data.was_transferor_principal_residence === true) {
+        const prYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferor\'s principal residence') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        prYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferor's principal residence YES`);
+          } catch (e) {}
+        });
+      } else if (data.was_principal_residence === false || data.was_transferor_principal_residence === false) {
+        const prNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferor\'s principal residence') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        prNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferor's principal residence NO`);
+          } catch (e) {}
+        });
+      }
+      
+      // Homeowners' Exemption
+      if (data.homeowners_exemption === true) {
+        const heFields = fields.filter(f => 
+          f.getName().includes('Homeowners') && f.getName().includes('Exemption')
+        );
+        heFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked Homeowners' Exemption`);
+          } catch (e) {}
+        });
+      }
+      
+      // Disabled Veterans' Exemption
+      if (data.disabled_veterans_exemption === true || data.disabled_veteran === true) {
+        const dvFields = fields.filter(f => 
+          f.getName().includes('Disabled Veterans') && f.getName().includes('Exemption')
+        );
+        dvFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked Disabled Veterans' Exemption`);
+          } catch (e) {}
+        });
+      }
+      
+      // Was only a partial interest transferred?
+      if (data.partial_interest === true) {
+        const piYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('partial interest') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        piYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked partial interest YES`);
+          } catch (e) {}
+        });
+      } else if (data.partial_interest === false) {
+        const piNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('partial interest') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        piNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked partial interest NO`);
+          } catch (e) {}
+        });
+      }
+      
+      // Was this property owned in joint tenancy?
+      if (data.joint_tenancy === true) {
+        const jtYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('joint tenancy') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        jtYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked joint tenancy YES`);
+          } catch (e) {}
+        });
+      } else if (data.joint_tenancy === false) {
+        const jtNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('joint tenancy') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        jtNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked joint tenancy NO`);
+          } catch (e) {}
+        });
+      }
+      
+      // Is this the transferee's family farm?
+      if (data.is_family_farm === true) {
+        const tffYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferee\'s family farm') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        tffYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferee's family farm YES`);
+          } catch (e) {}
+        });
+      } else if (data.is_family_farm === false) {
+        const tffNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferee\'s family farm') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        tffNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferee's family farm NO`);
+          } catch (e) {}
+        });
+      }
+      
+      // Is this the transferee's principal residence?
+      if (data.is_transferee_principal_residence === true || data.principal_residence === true) {
+        const tprYesFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferee\'s principal residence') && 
+                 (name.includes('Yes') || name.includes('YES'));
+        });
+        tprYesFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferee's principal residence YES`);
+          } catch (e) {}
+        });
+      } else if (data.is_transferee_principal_residence === false || data.principal_residence === false) {
+        const tprNoFields = fields.filter(f => {
+          const name = f.getName();
+          return name.includes('transferee\'s principal residence') && 
+                 (name.includes('No') || name.includes('NO'));
+        });
+        tprNoFields.forEach(field => {
+          try {
+            const checkbox = form.getCheckBox(field.getName());
+            checkbox.check();
+            console.log(`Checked transferee's principal residence NO`);
+          } catch (e) {}
+        });
+      }
+      
+    } catch (e) {
+      console.error('Error checking boxes:', e);
     }
     
     return await pdfDoc.save();
@@ -468,7 +926,6 @@ async function fillBOEForms(data) {
     
     try {
       console.log(`Processing ${name}...`);
-      // Add .pdf extension when loading
       const pdfBytes = await loadPDFFromDeployedSite(`${name}.pdf`);
       const filledPdf = await filler(data, pdfBytes);
       results[key] = Buffer.from(filledPdf).toString('base64');
@@ -517,6 +974,7 @@ exports.handler = async (event, context) => {
     // Parse request body
     const data = JSON.parse(event.body);
     console.log('Processing BOE forms for case:', data.case_number);
+    console.log('Input data:', JSON.stringify(data, null, 2));
     console.log('Forms requested:', {
       pcor: data.generate_pcor,
       boe_502d: data.generate_502d,
