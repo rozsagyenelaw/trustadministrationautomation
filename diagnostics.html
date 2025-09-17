@@ -85,4 +85,129 @@
             <button onclick="testSimple()">1. Test Simple Function</button>
             <button onclick="testCreateCase()">2. Test Create Case</button>
             <button onclick="testBOEForms()">3. Test BOE Forms</button>
-            <button onclick="checkAllEndpoints()">4. Check All Endpoints</b[paste the diagnostics.html content here]
+            <button onclick="checkAllEndpoints()">4. Check All Endpoints</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Results</h2>
+            <div id="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Debug Log</h2>
+            <div id="debug-log"></div>
+        </div>
+    </div>
+
+    <script>
+        function addLog(message, type = 'info') {
+            const logDiv = document.getElementById('debug-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + type;
+            entry.innerHTML = '[' + new Date().toLocaleTimeString() + '] ' + message;
+            logDiv.appendChild(entry);
+        }
+
+        function showResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const result = document.createElement('div');
+            result.className = type;
+            result.innerHTML = message;
+            resultsDiv.appendChild(result);
+        }
+
+        async function testSimple() {
+            addLog('Testing simple function...', 'info');
+            try {
+                const response = await fetch('/.netlify/functions/test-function');
+                const data = await response.json();
+                showResult('✅ Simple function works: ' + data.message, 'success');
+                addLog('Response: ' + JSON.stringify(data), 'success');
+            } catch (error) {
+                showResult('❌ Simple function failed: ' + error.message, 'error');
+                addLog('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function testCreateCase() {
+            addLog('Testing create-trust-case...', 'info');
+            try {
+                const response = await fetch('/.netlify/functions/create-trust-case', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        decedent_first_name: 'Test',
+                        decedent_last_name: 'User',
+                        death_date: '2024-01-15',
+                        trustee_name: 'Test Trustee',
+                        trust_name: 'Test Trust'
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showResult('✅ Create case works! Case #: ' + data.case_number, 'success');
+                } else {
+                    showResult('❌ Create case failed: ' + (data.error || data.details), 'error');
+                }
+                addLog('Response: ' + JSON.stringify(data), data.success ? 'success' : 'error');
+            } catch (error) {
+                showResult('❌ Create case error: ' + error.message, 'error');
+                addLog('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function testBOEForms() {
+            addLog('Testing BOE forms generation...', 'info');
+            try {
+                const response = await fetch('/.netlify/functions/generate-boe-forms', {
+                    method: 'OPTIONS'
+                });
+                if (response.ok || response.status === 405) {
+                    showResult('✅ BOE forms endpoint exists (status: ' + response.status + ')', 'success');
+                } else {
+                    showResult('❌ BOE forms endpoint error: ' + response.status, 'error');
+                }
+            } catch (error) {
+                showResult('❌ BOE forms error: ' + error.message, 'error');
+            }
+        }
+
+        async function checkAllEndpoints() {
+            const endpoints = [
+                'test-function',
+                'create-trust-case',
+                'generate-boe-forms',
+                'generate-government-notices',
+                'generate-property-documents',
+                'generate-trust-documents',
+                'generate-distribution-docs'
+            ];
+            
+            addLog('Checking all endpoints...', 'info');
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch('/.netlify/functions/' + endpoint, {
+                        method: 'OPTIONS'
+                    });
+                    if (response.ok || response.status === 405) {
+                        addLog('✅ ' + endpoint + ' is accessible', 'success');
+                    } else {
+                        addLog('❌ ' + endpoint + ' returned ' + response.status, 'error');
+                    }
+                } catch (error) {
+                    addLog('❌ ' + endpoint + ' failed: ' + error.message, 'error');
+                }
+            }
+            
+            showResult('Endpoint check complete. See log for details.', 'info');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('Diagnostics loaded', 'success');
+            addLog('Site URL: ' + window.location.origin, 'info');
+            addLog('Click the test buttons above to check each function', 'info');
+        });
+    </script>
+</body>
+</html>
