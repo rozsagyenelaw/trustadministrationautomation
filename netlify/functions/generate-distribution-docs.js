@@ -1,6 +1,7 @@
 // netlify/functions/generate-distribution-docs.js
+// UPDATED VERSION with improvements and fixes
 
-const { PDFDocument, rgb, StandardFonts, degrees } = require('pdf-lib');
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
 // Law office information
 const LAW_OFFICE = {
@@ -15,6 +16,7 @@ const LAW_OFFICE = {
 
 // Format date
 function formatDate(dateString) {
+  if (!dateString) return "_______________";
   const date = new Date(dateString);
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -23,8 +25,9 @@ function formatDate(dateString) {
 
 // Format currency
 function formatCurrency(amount) {
-  if (!amount) return "$0.00";
+  if (!amount && amount !== 0) return "$_______________";
   const num = parseFloat(amount.toString().replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return "$_______________";
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
@@ -47,7 +50,8 @@ async function generateWaiverOfAccounting(data) {
     x: width / 2 - 120,
     y: y,
     size: 16,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -55,7 +59,8 @@ async function generateWaiverOfAccounting(data) {
     x: width / 2 - 15,
     y: y,
     size: 16,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -63,32 +68,36 @@ async function generateWaiverOfAccounting(data) {
     x: width / 2 - 130,
     y: y,
     size: 16,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
   // Trust identification
-  page.drawText(`Trust: ${data.trust_name}`, {
+  page.drawText(`Trust: ${data.trust_name || '[TRUST NAME]'}`, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
-  page.drawText(`Trustee: ${data.trustee_name}`, {
+  page.drawText(`Trustee: ${data.trustee_name || '[TRUSTEE NAME]'}`, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
-  page.drawText(`Decedent: ${data.decedent_name}`, {
+  page.drawText(`Decedent: ${data.decedent_name || '[DECEDENT NAME]'}`, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -96,13 +105,17 @@ async function generateWaiverOfAccounting(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
   // Main text
+  const beneficiaryName = data.beneficiary_name || '[BENEFICIARY NAME]';
+  const trustName = data.trust_name || '[TRUST NAME]';
+  
   const mainText = [
-    `I, ${data.beneficiary_name}, am a beneficiary of the ${data.trust_name} (the "Trust").`,
+    `I, ${beneficiaryName}, am a beneficiary of the ${trustName} (the "Trust").`,
     '',
     'I hereby acknowledge and agree as follows:',
     '',
@@ -136,7 +149,7 @@ async function generateWaiverOfAccounting(data) {
   for (const line of mainText) {
     if (y < 150) {
       // Add new page if needed
-      const newPage = pdfDoc.addPage([612, 792]);
+      page = pdfDoc.addPage([612, 792]);
       y = height - 50;
     }
     
@@ -146,7 +159,8 @@ async function generateWaiverOfAccounting(data) {
         x: 70,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     } else if (line.match(/^\d\./)) {
       // Numbered paragraph
@@ -154,14 +168,16 @@ async function generateWaiverOfAccounting(data) {
         x: 50,
         y: y,
         size: 11,
-        font: helveticaBold
+        font: helveticaBold,
+        color: rgb(0, 0, 0)
       });
     } else {
       page.drawText(line, {
         x: 50,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     }
     y -= 15;
@@ -173,28 +189,32 @@ async function generateWaiverOfAccounting(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   y -= 40;
   page.drawLine({
     start: { x: 50, y: y },
     end: { x: 300, y: y },
-    thickness: 1
+    thickness: 1,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
-  page.drawText(data.beneficiary_name, {
+  page.drawText(beneficiaryName, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   page.drawText('Beneficiary', {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   return await pdfDoc.save();
@@ -203,7 +223,7 @@ async function generateWaiverOfAccounting(data) {
 // 2. RECEIPT AND RELEASE AGREEMENT
 async function generateReceiptAndRelease(data) {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([612, 792]);
+  let page = pdfDoc.addPage([612, 792]);
   const { width, height } = page.getSize();
   
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -216,15 +236,20 @@ async function generateReceiptAndRelease(data) {
     x: width / 2 - 180,
     y: y,
     size: 14,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
   // Parties
+  const trusteeName = data.trustee_name || '[TRUSTEE NAME]';
+  const trustName = data.trust_name || '[TRUST NAME]';
+  const beneficiaryName = data.beneficiary_name || '[BENEFICIARY NAME]';
+  
   const partiesText = [
     `This Receipt, Release and Refunding Agreement ("Agreement") is entered into as of`,
-    `_________________, 20__, by and between ${data.trustee_name}, as Trustee of the`,
-    `${data.trust_name} ("Trustee"), and ${data.beneficiary_name} ("Beneficiary").`
+    `_________________, 20__, by and between ${trusteeName}, as Trustee of the`,
+    `${trustName} ("Trustee"), and ${beneficiaryName} ("Beneficiary").`
   ];
   
   for (const line of partiesText) {
@@ -232,7 +257,8 @@ async function generateReceiptAndRelease(data) {
       x: 50,
       y: y,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     y -= 15;
   }
@@ -243,12 +269,15 @@ async function generateReceiptAndRelease(data) {
     x: width / 2 - 40,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
+  const decedentName = data.decedent_name || '[DECEDENT NAME]';
+  
   const recitals = [
-    `A. ${data.decedent_name} died on ${formatDate(data.death_date)}.`,
+    `A. ${decedentName} died on ${formatDate(data.death_date)}.`,
     '',
     `B. The Trustee has administered the Trust in accordance with its terms.`,
     '',
@@ -262,7 +291,8 @@ async function generateReceiptAndRelease(data) {
       x: 50,
       y: y,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     y -= 15;
   }
@@ -273,7 +303,8 @@ async function generateReceiptAndRelease(data) {
     x: width / 2 - 45,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -309,7 +340,7 @@ async function generateReceiptAndRelease(data) {
   for (const line of agreementText) {
     if (y < 150) {
       // Add new page
-      const newPage = pdfDoc.addPage([612, 792]);
+      page = pdfDoc.addPage([612, 792]);
       y = height - 50;
     }
     
@@ -318,21 +349,24 @@ async function generateReceiptAndRelease(data) {
         x: 70,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     } else if (line.match(/^\d\./)) {
       page.drawText(line, {
         x: 50,
         y: y,
         size: 11,
-        font: helveticaBold
+        font: helveticaBold,
+        color: rgb(0, 0, 0)
       });
     } else {
       page.drawText(line, {
         x: 50,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     }
     y -= 15;
@@ -346,28 +380,32 @@ async function generateReceiptAndRelease(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   page.drawLine({
     start: { x: 50, y: y },
     end: { x: 250, y: y },
-    thickness: 1
+    thickness: 1,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
-  page.drawText(`${data.trustee_name}, Trustee`, {
+  page.drawText(`${trusteeName}, Trustee`, {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   page.drawText('Date: _____________________', {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   // Beneficiary signature
@@ -376,28 +414,32 @@ async function generateReceiptAndRelease(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   page.drawLine({
     start: { x: 50, y: y },
     end: { x: 250, y: y },
-    thickness: 1
+    thickness: 1,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
-  page.drawText(data.beneficiary_name, {
+  page.drawText(beneficiaryName, {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   page.drawText('Date: _____________________', {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   return await pdfDoc.save();
@@ -419,7 +461,8 @@ async function generateDistributionReceipt(data) {
     x: width / 2 - 100,
     y: y,
     size: 16,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -427,7 +470,8 @@ async function generateDistributionReceipt(data) {
     x: width / 2 - 50,
     y: y,
     size: 16,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
@@ -441,32 +485,40 @@ async function generateDistributionReceipt(data) {
     borderWidth: 1
   });
   
+  const trustName = data.trust_name || '[TRUST NAME]';
+  const trusteeName = data.trustee_name || '[TRUSTEE NAME]';
+  const decedentName = data.decedent_name || '[DECEDENT NAME]';
+  
   page.drawText('TRUST INFORMATION', {
     x: 60,
     y: y - 20,
     size: 10,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   
-  page.drawText(`Trust Name: ${data.trust_name}`, {
+  page.drawText(`Trust Name: ${trustName}`, {
     x: 60,
     y: y - 35,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
-  page.drawText(`Trustee: ${data.trustee_name}`, {
+  page.drawText(`Trustee: ${trusteeName}`, {
     x: 60,
     y: y - 50,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
-  page.drawText(`Decedent: ${data.decedent_name} (DOD: ${formatDate(data.death_date)})`, {
+  page.drawText(`Decedent: ${decedentName} (DOD: ${formatDate(data.death_date)})`, {
     x: 60,
     y: y - 65,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   y -= 100;
@@ -476,11 +528,13 @@ async function generateDistributionReceipt(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 25;
   
-  const receiptText = `The undersigned, ${data.beneficiary_name}, hereby acknowledges receipt from ${data.trustee_name}, as Trustee of the above-referenced Trust, of the following distribution:`;
+  const beneficiaryName = data.beneficiary_name || '[BENEFICIARY NAME]';
+  const receiptText = `The undersigned, ${beneficiaryName}, hereby acknowledges receipt from ${trusteeName}, as Trustee of the above-referenced Trust, of the following distribution:`;
   
   // Word wrap receipt text
   const words = receiptText.split(' ');
@@ -492,7 +546,8 @@ async function generateDistributionReceipt(data) {
         x: 50,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
       y -= 15;
       line = word + ' ';
@@ -505,7 +560,8 @@ async function generateDistributionReceipt(data) {
       x: 50,
       y: y,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     y -= 25;
   }
@@ -524,17 +580,19 @@ async function generateDistributionReceipt(data) {
     x: 60,
     y: y - 20,
     size: 10,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   
   let detailY = y - 40;
   
-  if (data.cash_distribution) {
-    page.drawText(`Cash Distribution: ${formatCurrency(data.cash_distribution)}`, {
+  if (data.cash_distribution || data.distribution_amount) {
+    page.drawText(`Cash Distribution: ${formatCurrency(data.cash_distribution || data.distribution_amount)}`, {
       x: 60,
       y: detailY,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     detailY -= 20;
   }
@@ -544,7 +602,8 @@ async function generateDistributionReceipt(data) {
       x: 60,
       y: detailY,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     detailY -= 20;
   }
@@ -554,7 +613,8 @@ async function generateDistributionReceipt(data) {
       x: 60,
       y: detailY,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     detailY -= 20;
   }
@@ -564,18 +624,23 @@ async function generateDistributionReceipt(data) {
       x: 60,
       y: detailY,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
   }
   
   y -= 140;
   
   // Total value
-  page.drawText(`TOTAL VALUE OF DISTRIBUTION: ${formatCurrency(data.total_distribution)}`, {
+  const totalValue = data.total_distribution || data.distribution_amount || 
+    (parseFloat(data.cash_distribution || 0) + parseFloat(data.property_value || 0) + parseFloat(data.securities_value || 0));
+  
+  page.drawText(`TOTAL VALUE OF DISTRIBUTION: ${formatCurrency(totalValue)}`, {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
@@ -590,7 +655,8 @@ async function generateDistributionReceipt(data) {
       x: 50,
       y: y,
       size: 11,
-      font: helvetica
+      font: helvetica,
+      color: rgb(0, 0, 0)
     });
     y -= 15;
   }
@@ -602,22 +668,25 @@ async function generateDistributionReceipt(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   page.drawLine({
     start: { x: 50, y: y },
     end: { x: 300, y: y },
-    thickness: 1
+    thickness: 1,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   
-  page.drawText(`Print Name: ${data.beneficiary_name}`, {
+  page.drawText(`Print Name: ${beneficiaryName}`, {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -625,7 +694,8 @@ async function generateDistributionReceipt(data) {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   // Trustee acknowledgment
@@ -634,7 +704,8 @@ async function generateDistributionReceipt(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -642,22 +713,25 @@ async function generateDistributionReceipt(data) {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   page.drawLine({
     start: { x: 50, y: y },
     end: { x: 300, y: y },
-    thickness: 1
+    thickness: 1,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   
-  page.drawText(`${data.trustee_name}, Trustee`, {
+  page.drawText(`${trusteeName}, Trustee`, {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   return await pdfDoc.save();
@@ -666,7 +740,7 @@ async function generateDistributionReceipt(data) {
 // 4. FINAL DISTRIBUTION LETTER
 async function generateFinalDistributionLetter(data) {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([612, 792]);
+  let page = pdfDoc.addPage([612, 792]);
   const { width, height } = page.getSize();
   
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -679,7 +753,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 14,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -687,7 +762,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   
@@ -695,7 +771,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   
@@ -703,7 +780,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
@@ -712,16 +790,20 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   // Recipient
-  page.drawText(data.beneficiary_name, {
+  const beneficiaryName = data.beneficiary_name || '[BENEFICIARY NAME]';
+  
+  page.drawText(beneficiaryName, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   
@@ -732,7 +814,8 @@ async function generateFinalDistributionLetter(data) {
         x: 50,
         y: y,
         size: 12,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
       y -= 15;
     }
@@ -740,36 +823,45 @@ async function generateFinalDistributionLetter(data) {
   y -= 20;
   
   // Re line
-  page.drawText(`Re: ${data.trust_name}`, {
+  const trustName = data.trust_name || '[TRUST NAME]';
+  
+  page.drawText(`Re: ${trustName}`, {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 15;
   page.drawText(`     Final Distribution`, {
     x: 50,
     y: y,
     size: 12,
-    font: helveticaBold
+    font: helveticaBold,
+    color: rgb(0, 0, 0)
   });
   y -= 30;
   
   // Salutation
-  page.drawText(`Dear ${data.beneficiary_name}:`, {
+  const firstName = beneficiaryName.split(' ')[0];
+  page.drawText(`Dear ${firstName}:`, {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 25;
   
   // Letter body
+  const distributionAmount = formatCurrency(data.distribution_amount || data.cash_distribution);
+  const cashAmount = formatCurrency(data.cash_distribution || data.distribution_amount);
+  
   const letterBody = [
-    `I am pleased to inform you that the administration of the ${data.trust_name} has been`,
+    `I am pleased to inform you that the administration of the ${trustName} has been`,
     'completed. Enclosed please find the following:',
     '',
-    `1. Your final distribution check in the amount of ${formatCurrency(data.distribution_amount)}`,
+    `1. Your final distribution check in the amount of ${distributionAmount}`,
     '',
     '2. Receipt for Distribution form (please sign and return)',
     '',
@@ -783,7 +875,7 @@ async function generateFinalDistributionLetter(data) {
     '',
     'The distribution you are receiving represents your entire interest in the Trust. This includes:',
     '',
-    `• Cash distribution: ${data.cash_distribution ? formatCurrency(data.cash_distribution) : 'N/A'}`,
+    `• Cash distribution: ${cashAmount}`,
     `• Property: ${data.property_distribution || 'N/A'}`,
     `• Other assets: ${data.other_distribution || 'N/A'}`,
     '',
@@ -803,7 +895,7 @@ async function generateFinalDistributionLetter(data) {
   for (const line of letterBody) {
     if (y < 100) {
       // Add new page
-      const newPage = pdfDoc.addPage([612, 792]);
+      page = pdfDoc.addPage([612, 792]);
       y = height - 50;
     }
     
@@ -812,21 +904,24 @@ async function generateFinalDistributionLetter(data) {
         x: 70,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     } else if (line.match(/^\d\./)) {
       page.drawText(line, {
         x: 70,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     } else {
       page.drawText(line, {
         x: 50,
         y: y,
         size: 11,
-        font: helvetica
+        font: helvetica,
+        color: rgb(0, 0, 0)
       });
     }
     y -= 15;
@@ -838,7 +933,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
@@ -846,7 +942,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 40;
   
@@ -854,7 +951,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 12,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   y -= 20;
   
@@ -862,7 +960,8 @@ async function generateFinalDistributionLetter(data) {
     x: 50,
     y: y,
     size: 11,
-    font: helvetica
+    font: helvetica,
+    color: rgb(0, 0, 0)
   });
   
   return await pdfDoc.save();
@@ -870,6 +969,8 @@ async function generateFinalDistributionLetter(data) {
 
 // Main handler
 exports.handler = async (event, context) => {
+  console.log('Generate Distribution Documents handler called');
+  
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -895,29 +996,61 @@ exports.handler = async (event, context) => {
   
   try {
     const data = JSON.parse(event.body);
+    console.log('Processing distribution documents for beneficiary:', data.beneficiary_name);
     
     const documents = {};
+    let errors = [];
     
     // Generate requested documents
     if (data.generate_waiver !== false) {
-      const waiverPdf = await generateWaiverOfAccounting(data);
-      documents.waiver_of_accounting = Buffer.from(waiverPdf).toString('base64');
+      try {
+        console.log('Generating Waiver of Accounting...');
+        const waiverPdf = await generateWaiverOfAccounting(data);
+        documents.waiver_of_accounting = Buffer.from(waiverPdf).toString('base64');
+        console.log('Waiver generated successfully');
+      } catch (error) {
+        console.error('Error generating waiver:', error);
+        errors.push(`Waiver: ${error.message}`);
+      }
     }
     
     if (data.generate_release !== false) {
-      const releasePdf = await generateReceiptAndRelease(data);
-      documents.receipt_and_release = Buffer.from(releasePdf).toString('base64');
+      try {
+        console.log('Generating Receipt and Release...');
+        const releasePdf = await generateReceiptAndRelease(data);
+        documents.receipt_and_release = Buffer.from(releasePdf).toString('base64');
+        console.log('Receipt and Release generated successfully');
+      } catch (error) {
+        console.error('Error generating release:', error);
+        errors.push(`Release: ${error.message}`);
+      }
     }
     
     if (data.generate_receipt !== false) {
-      const receiptPdf = await generateDistributionReceipt(data);
-      documents.distribution_receipt = Buffer.from(receiptPdf).toString('base64');
+      try {
+        console.log('Generating Distribution Receipt...');
+        const receiptPdf = await generateDistributionReceipt(data);
+        documents.distribution_receipt = Buffer.from(receiptPdf).toString('base64');
+        console.log('Distribution Receipt generated successfully');
+      } catch (error) {
+        console.error('Error generating receipt:', error);
+        errors.push(`Receipt: ${error.message}`);
+      }
     }
     
     if (data.generate_letter !== false) {
-      const letterPdf = await generateFinalDistributionLetter(data);
-      documents.final_distribution_letter = Buffer.from(letterPdf).toString('base64');
+      try {
+        console.log('Generating Final Distribution Letter...');
+        const letterPdf = await generateFinalDistributionLetter(data);
+        documents.final_distribution_letter = Buffer.from(letterPdf).toString('base64');
+        console.log('Final Distribution Letter generated successfully');
+      } catch (error) {
+        console.error('Error generating letter:', error);
+        errors.push(`Letter: ${error.message}`);
+      }
     }
+    
+    console.log(`Successfully generated ${Object.keys(documents).length} documents`);
     
     return {
       statusCode: 200,
@@ -929,7 +1062,8 @@ exports.handler = async (event, context) => {
         success: true,
         message: `Generated ${Object.keys(documents).length} distribution documents`,
         documents: documents,
-        beneficiary: data.beneficiary_name
+        beneficiary: data.beneficiary_name,
+        errors: errors.length > 0 ? errors : undefined
       })
     };
     
@@ -942,8 +1076,10 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
+        success: false,
         error: 'Failed to generate documents',
-        details: error.message
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
