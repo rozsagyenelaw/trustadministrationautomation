@@ -2,7 +2,6 @@
 // WORKING VERSION that actually generates documents
 
 const { PDFDocument } = require('pdf-lib');
-const fetch = require('node-fetch');
 
 // Generate case number with proper format
 function generateCaseNumber() {
@@ -65,117 +64,167 @@ async function saveCaseData(caseData) {
   return true;
 }
 
-// ACTUALLY GENERATE DOCUMENTS BY CALLING THE FUNCTIONS
+// ACTUALLY GENERATE DOCUMENTS BY CALLING THE FUNCTIONS DIRECTLY
 async function generateInitialDocuments(caseData) {
   const generatedDocs = {};
-  const baseUrl = process.env.URL || process.env.DEPLOY_URL || 'https://trustadministrationautomation.netlify.app';
   
   console.log('Starting REAL document generation for case:', caseData.case_number);
-  console.log('Base URL for functions:', baseUrl);
-  
-  // Helper function to call other Netlify functions
-  async function callFunction(functionName, data) {
-    const url = `${baseUrl}/.netlify/functions/${functionName}`;
-    console.log(`Calling function: ${url}`);
-    
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      
-      if (!response.ok) {
-        console.error(`${functionName} returned status ${response.status}`);
-        return null;
-      }
-      
-      const result = await response.json();
-      console.log(`${functionName} result:`, result.success ? 'Success' : 'Failed');
-      return result;
-    } catch (err) {
-      console.error(`Error calling ${functionName}:`, err.message);
-      return null;
-    }
-  }
   
   try {
+    // Instead of using fetch to call functions, we'll import and call them directly
+    // This is the KEY FIX - direct function calls work in Netlify
+    
     // 1. Generate BOE Forms
     if (caseData.generate_boe_forms && (caseData.real_property?.length > 0 || caseData.property_address)) {
       console.log('Generating BOE forms...');
-      const boeResult = await callFunction('generate-boe-forms', {
-        ...caseData,
-        generate_pcor: true,
-        generate_502d: true,
-        generate_19p: caseData.transfer_type === 'parent_child'
-      });
-      
-      if (boeResult?.success && boeResult.documents) {
-        Object.assign(generatedDocs, boeResult.documents);
-        console.log('BOE forms added:', Object.keys(boeResult.documents).join(', '));
+      try {
+        const boeHandler = require('./generate-boe-forms').handler;
+        const boeEvent = {
+          httpMethod: 'POST',
+          body: JSON.stringify({
+            ...caseData,
+            generate_pcor: true,
+            generate_502d: true,
+            generate_19p: caseData.transfer_type === 'parent_child'
+          })
+        };
+        
+        const boeResponse = await boeHandler(boeEvent, {});
+        if (boeResponse.statusCode === 200) {
+          const boeResult = JSON.parse(boeResponse.body);
+          if (boeResult.success && boeResult.documents) {
+            Object.assign(generatedDocs, boeResult.documents);
+            console.log('BOE forms added:', Object.keys(boeResult.documents).join(', '));
+          }
+        }
+      } catch (boeError) {
+        console.error('BOE generation error:', boeError.message);
       }
     }
     
     // 2. Generate Government Notices
     if (caseData.generate_gov_notices) {
       console.log('Generating government notices...');
-      const govResult = await callFunction('generate-government-notices', {
-        ...caseData,
-        agencies: ['ftb', 'irs', 'dhcs', 'ssa']
-      });
-      
-      if (govResult?.success && govResult.documents) {
-        Object.assign(generatedDocs, govResult.documents);
-        console.log('Government notices added:', Object.keys(govResult.documents).join(', '));
+      try {
+        const govHandler = require('./generate-government-notices').handler;
+        const govEvent = {
+          httpMethod: 'POST',
+          body: JSON.stringify({
+            ...caseData,
+            agencies: ['ftb', 'irs', 'dhcs', 'ssa']
+          })
+        };
+        
+        const govResponse = await govHandler(govEvent, {});
+        if (govResponse.statusCode === 200) {
+          const govResult = JSON.parse(govResponse.body);
+          if (govResult.success && govResult.documents) {
+            Object.assign(generatedDocs, govResult.documents);
+            console.log('Government notices added:', Object.keys(govResult.documents).join(', '));
+          }
+        }
+      } catch (govError) {
+        console.error('Government notices error:', govError.message);
       }
     }
     
     // 3. Generate Property Documents
     if (caseData.generate_property_docs && (caseData.real_property?.length > 0 || caseData.property_address)) {
       console.log('Generating property documents...');
-      const propResult = await callFunction('generate-property-documents', {
-        ...caseData,
-        generate_affidavit: true,
-        generate_trust_deed: true,
-        generate_certification: true
-      });
-      
-      if (propResult?.success && propResult.documents) {
-        Object.assign(generatedDocs, propResult.documents);
-        console.log('Property documents added:', Object.keys(propResult.documents).join(', '));
+      try {
+        const propHandler = require('./generate-property-documents').handler;
+        const propEvent = {
+          httpMethod: 'POST',
+          body: JSON.stringify({
+            ...caseData,
+            generate_affidavit: true,
+            generate_trust_deed: true,
+            generate_certification: true,
+            grantor_name: caseData.trustee_name,
+            grantor_address: caseData.trustee_address,
+            surviving_trustee: caseData.trustee_name,
+            instrument_number: caseData.document_number || '',
+            deed_date: caseData.transfer_date || ''
+          })
+        };
+        
+        const propResponse = await propHandler(propEvent, {});
+        if (propResponse.statusCode === 200) {
+          const propResult = JSON.parse(propResponse.body);
+          if (propResult.success && propResult.documents) {
+            Object.assign(generatedDocs, propResult.documents);
+            console.log('Property documents added:', Object.keys(propResult.documents).join(', '));
+          }
+        }
+      } catch (propError) {
+        console.error('Property documents error:', propError.message);
       }
     }
     
     // 4. Generate Trust Documents (60-day notices)
     if (caseData.generate_60day) {
       console.log('Generating trust documents (60-day notices)...');
-      const trustResult = await callFunction('generate-trust-documents', {
-        ...caseData,
-        generate_receipt: true,
-        generate_waiver: true,
-        generate_60day_notice: true
-      });
-      
-      if (trustResult?.success && trustResult.documents) {
-        Object.assign(generatedDocs, trustResult.documents);
-        console.log('Trust documents added:', Object.keys(trustResult.documents).join(', '));
+      try {
+        const trustHandler = require('./generate-trust-documents').handler;
+        const trustEvent = {
+          httpMethod: 'POST',
+          body: JSON.stringify({
+            ...caseData,
+            generate_receipt: true,
+            generate_waiver: true,
+            generate_60day_notice: true
+          })
+        };
+        
+        const trustResponse = await trustHandler(trustEvent, {});
+        if (trustResponse.statusCode === 200) {
+          const trustResult = JSON.parse(trustResponse.body);
+          if (trustResult.success && trustResult.documents) {
+            Object.assign(generatedDocs, trustResult.documents);
+            console.log('Trust documents added:', Object.keys(trustResult.documents).join(', '));
+          }
+        }
+      } catch (trustError) {
+        console.error('Trust documents error:', trustError.message);
       }
     }
     
     // 5. Generate Distribution Documents
     if (caseData.generate_distribution_docs && caseData.beneficiaries?.length > 0) {
       console.log('Generating distribution documents...');
-      const distResult = await callFunction('generate-distribution-docs', {
-        ...caseData,
-        generate_waiver: true,
-        generate_release: true,
-        generate_receipt: true,
-        generate_letter: true
-      });
-      
-      if (distResult?.success && distResult.documents) {
-        Object.assign(generatedDocs, distResult.documents);
-        console.log('Distribution documents added:', Object.keys(distResult.documents).join(', '));
+      try {
+        const distHandler = require('./generate-distribution-docs').handler;
+        
+        // Generate for first beneficiary as example
+        if (caseData.beneficiaries[0]) {
+          const beneficiary = caseData.beneficiaries[0];
+          const distEvent = {
+            httpMethod: 'POST',
+            body: JSON.stringify({
+              ...caseData,
+              beneficiary_name: beneficiary.name,
+              beneficiary_address: beneficiary.address,
+              beneficiary_email: beneficiary.email,
+              distribution_amount: beneficiary.percent ? 
+                (parseFloat(caseData.estate_value || 0) * parseFloat(beneficiary.percent) / 100) : 0,
+              generate_waiver: true,
+              generate_release: true,
+              generate_receipt: true,
+              generate_letter: true
+            })
+          };
+          
+          const distResponse = await distHandler(distEvent, {});
+          if (distResponse.statusCode === 200) {
+            const distResult = JSON.parse(distResponse.body);
+            if (distResult.success && distResult.documents) {
+              Object.assign(generatedDocs, distResult.documents);
+              console.log('Distribution documents added:', Object.keys(distResult.documents).join(', '));
+            }
+          }
+        }
+      } catch (distError) {
+        console.error('Distribution documents error:', distError.message);
       }
     }
     
@@ -332,7 +381,6 @@ exports.handler = async (event, context) => {
       deadlines: deadlines,
       
       // === DOCUMENT GENERATION FLAGS ===
-      generate_initial_docs: formData.generate_initial_docs || false,
       generate_60day: formData.generate_60day || false,
       generate_gov_notices: formData.generate_gov_notices || false,
       generate_boe_forms: formData.generate_boe_forms || false,
@@ -380,7 +428,14 @@ exports.handler = async (event, context) => {
     let documentsGenerated = {};
     let documentsList = [];
     
-    if (formData.generate_initial_docs) {
+    // Check if ANY document generation flag is true
+    const shouldGenerateDocs = caseData.generate_60day || 
+                              caseData.generate_gov_notices || 
+                              caseData.generate_boe_forms || 
+                              caseData.generate_property_docs || 
+                              caseData.generate_distribution_docs;
+    
+    if (shouldGenerateDocs) {
       console.log('Starting document generation process...');
       console.log('Flags:', {
         generate_60day: caseData.generate_60day,
