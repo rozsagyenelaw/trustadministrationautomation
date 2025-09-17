@@ -1,4 +1,4 @@
-/ netlify/functions/create-trust-case-fixed.js
+// netlify/functions/create-trust-case-fixed.js
 // COMPLETE VERSION with all data collection and document generation
 
 const { PDFDocument } = require('pdf-lib');
@@ -375,3 +375,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
