@@ -1,0 +1,28 @@
+{
+  "name": "trust-administration-automation",
+  "version": "1.0.0",
+  "description": "Internal automation system for trust administration - Law Offices of Rozsa Gyene",
+  "main": "index.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build needed'",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "node-fetch": "^2.6.7",
+    "@netlify/functions": "^2.4.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.10.1"
+  },
+  "keywords": [
+    "trust",
+    "administration",
+    "automation",
+    "legal",
+    "california"
+  ],
+  "author": "Law Offices of Rozsa Gyene",
+  "license": "PRIVATE"
+}
