@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trust Administration Automation System - Law Offices of Rozsa Gyene</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #1e3a5f;
+            --accent-gold: #c9a961;
+            --success-green: #28a745;
+            --danger-red: #dc3545;
+            --warning-orange: #fd7e14;
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --border-color: #dee2e6;
+            --background: #f8f9fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--primary-blue);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .logo span {
+            display: block;
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-gold);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .action-btn {
+            padding: 12px 20px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.3s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-btn:hover {
+            background: #2a4a6f;
+            transform: translateX(5px);
+        }
+
+        .action-btn.gold {
+            background: var(--accent-gold);
+        }
+
+        .action-btn.gold:hover {
+            background: #b8982f;
+        }
+
+        .action-btn.green {
+            background: var(--success-green);
+        }
+
+        .action-btn.green:hover {
+            background: #218838;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            padding: 15px;
+            background: var(--background);
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-gold);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--background);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 14px;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover {
+            background: var(--background);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: var(--success-green);
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-urgent {
+            background: #f8d7da;
+            color: var(--danger-red);
+        }
+
+        .deadline-warning {
+            color: var(--danger-red);
+            font-weight: 600;
+        }
+
+        .deadline-soon {
+            color: var(--warning-orange);
+            font-weight: 600;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .modal-header {
+            font-size: 24px;
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .close-modal {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 30px;
+            color: var(--text-light);
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 15px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .submit-btn {
+            background: var(--accent-gold);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #b8982f;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-gold);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: var(--success-green);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: var(--danger-red);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>TRUST ADMINISTRATION AUTOMATION</h1>
+                <span>Law Offices of Rozsa Gyene - Internal System</span>
+            </div>
+            <div class="user-info">
+                <span id="current-date"></span>
+                <span id="current-time"></span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Quick Actions Section -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Quick Actions</h2>
+                    <div class="card-icon">⚡</div>
+                </div>
+                <div class="quick-actions">
+                    <button class="action-btn gold" onclick="openNewCaseModal()">
+                        ➕ New Trust Administration Case
+                    </button>
+                    <button class="action-btn" onclick="generateNotices()">
+                        📄 Generate 60-Day Notices
+                    </button>
+                    <button class="action-btn" onclick="generateGovernmentNotices()">
+                        🏛️ Government Agency Notices
+                    </button>
+                    <button class="action-btn green" onclick="generateABTrustDocs()">
+                        📑 A/B Trust Split Documents
+                    </button>
+                    <button class="action-btn" onclick="generatePropertyDocs()">
+                        🏠 Real Property Documents
+                    </button>
+                    <button class="action-btn" onclick="generateAccountingReport()">
+                        📊 Trust Accounting Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Current Statistics</h2>
+                    <div class="card-icon">📈</div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="active-cases">0</div>
+                        <div class="stat-label">Active Cases</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="pending-notices">0</div>
+                        <div class="stat-label">Pending Notices</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="upcoming-deadlines">0</div>
+                        <div class="stat-label">Upcoming Deadlines</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="docs-generated">0</div>
+                        <div class="stat-label">Docs This Month</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Documents -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Recent Documents</h2>
+                    <div class="card-icon">📁</div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <tbody id="recent-docs">
+                            <tr>
+                                <td colspan="2" style="text-align: center; padding: 20px; color: #6c757d;">
+                                    No recent documents.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Cases Table -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Active Trust Administration Cases</h2>
+                <div class="card-icon">📋</div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Case #</th>
+                            <th>Decedent Name</th>
+                            <th>Trustee</th>
+                            <th>Date of Death</th>
+                            <th>60-Day Deadline</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cases-table">
+                        <!-- Cases will be loaded dynamically -->
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No active cases. Click "New Trust Administration Case" to get started.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Upcoming Deadlines -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Upcoming Deadlines</h2>
+                <div class="card-icon">⏰</div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Case</th>
+                            <th>Deadline Type</th>
+                            <th>Due Date</th>
+                            <th>Days Remaining</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deadlines-table">
+                        <!-- Deadlines will be loaded dynamically -->
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No upcoming deadlines.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Case Modal -->
+    <div id="newCaseModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeNewCaseModal()">&times;</span>
+            <h2 class="modal-header">New Trust Administration Case</h2>
+            
+            <div class="success-message" id="success-msg"></div>
+            <div class="error-message" id="error-msg"></div>
+            
+            <form id="quickIntakeForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Decedent First Name *</label>
+                        <input type="text" id="decedent-first" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Decedent Last Name *</label>
+                        <input type="text" id="decedent-last" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date of Death *</label>
+                        <input type="date" id="death-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>SSN (Last 4)</label>
+                        <input type="text" id="ssn-last4" maxlength="4" pattern="\d{4}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Marital Status at Death</label>
+                    <select id="marital-status">
+                        <option value="single">Single</option>
+                        <option value="married">Married</option>
+                        <option value="divorced">Divorced</option>
+                        <option value="widowed">Widowed</option>
+                    </select>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Trustee Name *</label>
+                        <input type="text" id="trustee-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Trustee Phone</label>
+                        <input type="tel" id="trustee-phone">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Trust Name *</label>
+                    <input type="text" id="trust-name" placeholder="e.g., The John Smith Revocable Living Trust" required>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Trust Type</label>
+                        <select id="trust-type">
+                            <option value="single">Single Revocable Trust</option>
+                            <option value="joint">Joint Trust</option>
+                            <option value="ab">A/B Trust (needs split)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estate Value (approx)</label>
+                        <input type="text" id="estate-value" placeholder="$">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Initial Notes</label>
+                    <textarea id="initial-notes" rows="3"></textarea>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Creating case and generating documents...</p>
+                </div>
+                
+                <button type="submit" class="submit-btn">Create Case & Generate Initial Documents</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('current-date').textContent = now.toLocaleDateString();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Load cases from storage (localStorage for now, database in production)
+        async function loadCases() {
+            try {
+                // In production, this would fetch from your database
+                // const response = await fetch('/.netlify/functions/get-cases');
+                // const cases = await response.json();
+                
+                // For now, load from localStorage
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                
+                const tbody = document.getElementById('cases-table');
+                
+                if (cases.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No active cases. Click "New Trust Administration Case" to get started.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tbody.innerHTML = cases.map(c => {
+                    const deadlineDays = calculateDaysRemaining(c.deadlines.sixty_day_notice);
+                    const deadlineClass = deadlineDays < 7 ? 'deadline-warning' : deadlineDays < 30 ? 'deadline-soon' : '';
+                    const statusClass = deadlineDays < 7 ? 'status-urgent' : 'status-active';
+                    const statusText = deadlineDays < 7 ? 'Notice Due' : 'In Progress';
+                    
+                    return `
+                        <tr>
+                            <td>${c.case_number}</td>
+                            <td>${c.decedent_name}</td>
+                            <td>${c.trustee_name}</td>
+                            <td>${formatDate(c.death_date)}</td>
+                            <td class="${deadlineClass}">${formatDate(c.deadlines.sixty_day_notice)}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>
+                                <button onclick="viewCase('${c.case_number}')">View</button>
+                                <button onclick="generateDocs('${c.case_number}')">Generate Docs</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                // Update statistics
+                document.getElementById('active-cases').textContent = cases.length;
+                document.getElementById('pending-notices').textContent = cases.filter(c => 
+                    calculateDaysRemaining(c.deadlines.sixty_day_notice) > 0
+                ).length;
+                
+            } catch (error) {
+                console.error('Error loading cases:', error);
+            }
+        }
+
+        // Load deadlines
+        async function loadDeadlines() {
+            try {
+                const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                const tbody = document.getElementById('deadlines-table');
+                
+                if (cases.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No upcoming deadlines.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Collect all deadlines from all cases
+                const allDeadlines = [];
+                
+                cases.forEach(c => {
+                    if (c.deadlines) {
+                        Object.entries(c.deadlines).forEach(([type, date]) => {
+                            if (date && calculateDaysRemaining(date) > 0) {
+                                allDeadlines.push({
+                                    case_name: c.trust_name || c.decedent_name,
+                                    case_number: c.case_number,
+                                    type: formatDeadlineType(type),
+                                    date: date,
+                                    days: calculateDaysRemaining(date)
+                                });
+                            }
+                        });
+                    }
+                });
+                
+                // Sort by date
+                allDeadlines.sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                // Display top 10 upcoming deadlines
+                const upcomingDeadlines = allDeadlines.slice(0, 10);
+                
+                if (upcomingDeadlines.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No upcoming deadlines.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tbody.innerHTML = upcomingDeadlines.map(d => {
+                    const deadlineClass = d.days < 7 ? 'deadline-warning' : d.days < 30 ? 'deadline-soon' : '';
+                    return `
+                        <tr>
+                            <td>${d.case_name}</td>
+                            <td>${d.type}</td>
+                            <td class="${deadlineClass}">${formatDate(d.date)}</td>
+                            <td class="${deadlineClass}">${d.days} days</td>
+                            <td><button onclick="handleDeadline('${d.case_number}', '${d.type}')">Take Action</button></td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                // Update deadline count
+                document.getElementById('upcoming-deadlines').textContent = upcomingDeadlines.length;
+                
+            } catch (error) {
+                console.error('Error loading deadlines:', error);
+            }
+        }
+
+        // Load recent documents
+        async function loadRecentDocuments() {
+            try {
+                const docs = JSON.parse(localStorage.getItem('recent_documents') || '[]');
+                const tbody = document.getElementById('recent-docs');
+                
+                if (docs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="2" style="text-align: center; padding: 20px; color: #6c757d;">
+                                No recent documents.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tbody.innerHTML = docs.slice(0, 5).map(doc => `
+                    <tr>
+                        <td>${doc.name}</td>
+                        <td><span class="status-badge ${doc.status === 'complete' ? 'status-active' : 'status-pending'}">${doc.status}</span></td>
+                    </tr>
+                `).join('');
+                
+                // Update document count for this month
+                const thisMonth = new Date().getMonth();
+                const thisMonthDocs = docs.filter(d => new Date(d.created).getMonth() === thisMonth);
+                document.getElementById('docs-generated').textContent = thisMonthDocs.length;
+                
+            } catch (error) {
+                console.error('Error loading recent documents:', error);
+            }
+        }
+
+        // Helper functions
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+        }
+
+        function calculateDaysRemaining(dateString) {
+            if (!dateString) return 0;
+            const deadline = new Date(dateString);
+            const today = new Date();
+            const diffTime = deadline - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+
+        function formatDeadlineType(type) {
+            const types = {
+                'sixty_day_notice': '60-Day Notice',
+                'contest_deadline': 'Contest Period Ends',
+                'creditor_claims': 'Creditor Claims Deadline',
+                'estate_tax_706': 'Estate Tax Return (706)',
+                'final_income_tax': 'Final Income Tax (1041)'
+            };
+            return types[type] || type;
+        }
+
+        function handleDeadline(caseNumber, deadlineType) {
+            // Handle different deadline types
+            if (deadlineType.includes('60-Day')) {
+                generate60DayNotice(caseNumber);
+            } else if (deadlineType.includes('Tax')) {
+                alert(`Preparing tax documents for case ${caseNumber}`);
+            } else {
+                alert(`Handling deadline: ${deadlineType} for case ${caseNumber}`);
+            }
+        }
+
+        // Load all data on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCases();
+            loadDeadlines();
+            loadRecentDocuments();
+            
+            // Refresh every 60 seconds
+            setInterval(() => {
+                loadCases();
+                loadDeadlines();
+                loadRecentDocuments();
+            }, 60000);
+        });
+
+        // Modal functions
+        function openNewCaseModal() {
+            document.getElementById('newCaseModal').style.display = 'block';
+        }
+
+        function closeNewCaseModal() {
+            document.getElementById('newCaseModal').style.display = 'none';
+            document.getElementById('quickIntakeForm').reset();
+            document.getElementById('success-msg').style.display = 'none';
+            document.getElementById('error-msg').style.display = 'none';
+        }
+
+        // Form submission - REAL DATA
+        document.getElementById('quickIntakeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('success-msg').style.display = 'none';
+            document.getElementById('error-msg').style.display = 'none';
+            
+            const formData = {
+                decedent_first_name: document.getElementById('decedent-first').value,
+                decedent_last_name: document.getElementById('decedent-last').value,
+                death_date: document.getElementById('death-date').value,
+                ssn_last4: document.getElementById('ssn-last4').value,
+                marital_status: document.getElementById('marital-status').value,
+                trustee_name: document.getElementById('trustee-name').value,
+                trustee_phone: document.getElementById('trustee-phone').value,
+                trust_name: document.getElementById('trust-name').value,
+                trust_type: document.getElementById('trust-type').value,
+                estate_value: document.getElementById('estate-value').value,
+                initial_notes: document.getElementById('initial-notes').value,
+                generate_initial_docs: true
+            };
+            
+            try {
+                const response = await fetch('/.netlify/functions/create-trust-case', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Save case to localStorage (temporary storage)
+                    const cases = JSON.parse(localStorage.getItem('trust_cases') || '[]');
+                    cases.push({
+                        case_number: result.case_number,
+                        decedent_name: `${formData.decedent_first_name} ${formData.decedent_last_name}`,
+                        death_date: formData.death_date,
+                        trustee_name: formData.trustee_name,
+                        trust_name: formData.trust_name,
+                        deadlines: result.case_data.deadlines,
+                        created: new Date().toISOString()
+                    });
+                    localStorage.setItem('trust_cases', JSON.stringify(cases));
+                    
+                    document.getElementById('success-msg').textContent = `Case ${result.case_number} created successfully!`;
+                    document.getElementById('success-msg').style.display = 'block';
+                    
+                    // Reload data
+                    loadCases();
+                    loadDeadlines();
+                    
+                    // Close modal after 3 seconds
+                    setTimeout(() => {
+                        closeNewCaseModal();
+                    }, 3000);
+                } else {
+                    throw new Error(result.error || 'Failed to create case');
+                }
+            } catch (error) {
+                document.getElementById('error-msg').textContent = `Error: ${error.message}`;
+                document.getElementById('error-msg').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        // Generate various documents
+        async function generateGovernmentNotices() {
+            const caseNumber = prompt('Enter Case Number (e.g., TA-2024-001):');
+            if (!caseNumber) return;
+            
+            try {
+                const response = await fetch('/.netlify/functions/generate-government-notices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ case_number: caseNumber })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Government notices generated successfully!');
+                    downloadDocuments(result.documents, caseNumber);
+                }
+            } catch (error) {
+                alert('Error generating notices: ' + error.message);
+            }
+        }
+
+        function generateABTrustDocs() {
+            const caseNumber = prompt('Enter Case Number for A/B Trust Split:');
+            if (!caseNumber) return;
+            
+            // This would call the A/B trust document generation function
+            alert('A/B Trust split documents will be generated for case ' + caseNumber);
+        }
+
+        function generatePropertyDocs() {
+            const caseNumber = prompt('Enter Case Number for Property Documents:');
+            if (!caseNumber) return;
+            
+            // This would call the property document generation function
+            alert('Property documents will be generated for case ' + caseNumber);
+        }
+
+        function generateAccountingReport() {
+            const caseNumber = prompt('Enter Case Number for Trust Accounting:');
+            if (!caseNumber) return;
+            
+            // This would call the accounting report generation function
+            alert('Trust accounting report will be generated for case ' + caseNumber);
+        }
+
+        // Download generated documents
+        function downloadDocuments(documents, caseNumber) {
+            Object.entries(documents).forEach(([name, base64]) => {
+                const link = document.createElement('a');
+                link.href = 'data:application/pdf;base64,' + base64;
+                link.download = `${caseNumber}_${name}.pdf`;
+                link.click();
+            });
+        }
+
+        // View case details
+        function viewCase(caseNumber) {
+            window.location.href = `/case-details.html?case=${caseNumber}`;
+        }
+
+        // Generate documents for existing case
+        function generateDocs(caseNumber) {
+            const docType = prompt('Which documents to generate?\n1. 60-Day Notice\n2. Government Notices\n3. Property Docs\n4. All Documents');
+            
+            switch(docType) {
+                case '1':
+                    generateNotices();
+                    break;
+                case '2':
+                    generateGovernmentNotices();
+                    break;
+                case '3':
+                    generatePropertyDocs();
+                    break;
+                case '4':
+                    alert('Generating all documents for case ' + caseNumber);
+                    break;
+            }
+        }
+
+        // Generate specific notice
+        function generateNotice(caseName) {
+            alert(`Generating 60-day notice for ${caseName} trust`);
+        }
+
+        // Prepare tax documents
+        function prepareTaxDocs(caseName) {
+            alert(`Preparing tax documents for ${caseName} estate`);
+        }
+
+        // Generate notices
+        function generateNotices() {
+            const caseNumber = prompt('Enter Case Number for 60-Day Notices:');
+            if (!caseNumber) return;
+            
+            alert('60-Day notices will be generated for case ' + caseNumber);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
